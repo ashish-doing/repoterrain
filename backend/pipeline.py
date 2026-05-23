@@ -72,58 +72,76 @@ async def fetch_repo_files(repo_url: str, token: Optional[str] = None, max_files
     files = {}
     summary = f"Repository: {repo_url}"
 
-    async with httpx.AsyncClient(timeout=30, headers=headers) as client:
+    async with httpx.AsyncClient(timeout=60, headers=headers) as client:
+        # First verify project exists
+        print(f"[pipeline] Checking project: {base}")
+        r = await client.get(f"{base}")
+        if r.status_code == 404:
+            raise ValueError(f"Repo not found: {repo_url}. Make sure it's public or provide a token.")
+        if r.status_code != 200:
+            raise ValueError(f"GitLab API error {r.status_code}: {r.text[:200]}")
+
+        project_info = r.json()
+        default_branch = project_info.get("default_branch", "main")
+        print(f"[pipeline] Default branch: {default_branch}")
+
         # Get file tree (recursive)
-        print(f"[pipeline] Fetching file tree from GitLab API...")
-        try:
+        print(f"[pipeline] Fetching file tree...")
+        all_items = []
+        page = 1
+        while len(all_items) < 500:
             r = await client.get(f"{base}/repository/tree", params={
-                "recursive": "true", "per_page": 100, "pagination": "keyset"
+                "recursive": "true",
+                "per_page": 100,
+                "page": page,
+                "ref": default_branch,
             })
             if r.status_code != 200:
-                raise ValueError(f"GitLab API error {r.status_code}: {r.text[:200]}")
+                print(f"[pipeline] Tree error {r.status_code}: {r.text[:200]}")
+                break
+            items = r.json()
+            if not items:
+                break
+            all_items.extend(items)
+            if len(items) < 100:
+                break
+            page += 1
 
-            tree_items = r.json()
-            # Filter to files only, skip binary/generated
-            file_paths = []
-            for item in tree_items:
-                if item.get("type") != "blob":
-                    continue
-                path = item["path"]
-                if should_skip(path):
-                    continue
+        print(f"[pipeline] Total tree items: {len(all_items)}")
+
+        # Filter to files only
+        file_paths = []
+        for item in all_items:
+            if item.get("type") != "blob":
+                continue
+            path = item["path"]
+            if not should_skip(path):
                 file_paths.append(path)
 
-            print(f"[pipeline] Found {len(file_paths)} files, fetching content...")
-            file_paths = file_paths[:max_files]
+        print(f"[pipeline] Filtered to {len(file_paths)} files, fetching content...")
+        file_paths = file_paths[:max_files]
 
-            # Fetch file contents in parallel batches
-            for i in range(0, len(file_paths), 10):
-                batch = file_paths[i:i+10]
-                tasks = [fetch_file_content(client, base, fp) for fp in batch]
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-                for fp, content in zip(batch, results):
-                    if isinstance(content, Exception):
-                        continue
-                    if content and len(content.strip()) > 10:
-                        files[fp] = content[:CHUNK_SIZE]
-                print(f"[pipeline] Fetched {min(i+10, len(file_paths))}/{len(file_paths)} files")
-
-        except Exception as e:
-            print(f"[pipeline] GitLab API failed: {e}, falling back to gitingest...")
-            files = await fallback_gitingest(repo_url, token)
+        # Fetch file contents in parallel batches
+        for i in range(0, len(file_paths), 10):
+            batch = file_paths[i:i+10]
+            tasks = [fetch_file_content(client, base, fp, default_branch) for fp in batch]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for fp, content in zip(batch, results):
+                if isinstance(content, Exception):
+                    continue
+                if content and len(content.strip()) > 10:
+                    files[fp] = content[:CHUNK_SIZE]
+            print(f"[pipeline] Fetched {min(i+10, len(file_paths))}/{len(file_paths)} files")
 
     print(f"[pipeline] Got {len(files)} files")
     print(f"[pipeline] Sample paths: {list(files.keys())[:5]}")
     return files, summary
 
 
-async def fetch_file_content(client: httpx.AsyncClient, base: str, filepath: str) -> str:
+async def fetch_file_content(client: httpx.AsyncClient, base: str, filepath: str, branch: str = "main") -> str:
     """Fetch single file content via GitLab API."""
     encoded_path = filepath.replace('/', '%2F')
-    r = await client.get(f"{base}/repository/files/{encoded_path}/raw", params={"ref": "main"})
-    if r.status_code != 200:
-        # Try 'master' branch
-        r = await client.get(f"{base}/repository/files/{encoded_path}/raw", params={"ref": "master"})
+    r = await client.get(f"{base}/repository/files/{encoded_path}/raw", params={"ref": branch})
     if r.status_code == 200:
         return r.text
     return ""
