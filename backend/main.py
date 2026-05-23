@@ -45,17 +45,6 @@ class AgentQueryRequest(BaseModel):
 async def root():
     return {"status": "RepoTerrain API running", "version": "1.0.0"}
 
-@app.get("/debug/ingest")
-async def debug_ingest(repo_url: str = "https://gitlab.com/gitlab-org/gitlab-runner"):
-    """Debug: see raw gitingest output to fix filename parsing."""
-    from gitingest import ingest_async
-    summary, tree, content = await ingest_async(repo_url)
-    return {
-        "tree_preview": tree[:800],
-        "content_preview": content[:3000],
-        "content_length": len(content),
-    }
-
 @app.post("/ingest")
 async def ingest_repo(req: IngestRequest):
     try:
