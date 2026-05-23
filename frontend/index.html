@@ -1539,9 +1539,13 @@ async function startIngest() {
     setTimeout(() => showTerrain(data, repoUrl), 600);
   } catch (err) {
     clearInterval(interval);
-    console.warn('API not available, demo mode:', err.message);
-    setProgress(100, 'Demo terrain loaded');
-    setTimeout(() => showTerrain(generateDemoTerrain(), repoUrl), 600);
+    console.error('API error:', err);
+    // Show error clearly — don't silently fall back
+    setProgress(0, '❌ Backend error: ' + err.message);
+    document.getElementById('progress-label').style.color = '#ff4444';
+    document.getElementById('ingest-btn').disabled = false;
+    document.getElementById('btn-text').textContent = 'Map Terrain';
+    alert('Backend error: ' + err.message + '\n\nMake sure uvicorn is running on port 8080.');
   }
 }
 
