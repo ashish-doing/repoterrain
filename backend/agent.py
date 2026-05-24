@@ -5,6 +5,8 @@ No GCP project or Vertex AI needed for this.
 
 Get a free API key at: https://aistudio.google.com/app/apikey
 """
+from dotenv import load_dotenv
+load_dotenv()
 
 import os
 import json
@@ -15,7 +17,7 @@ from typing import Optional
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GITLAB_TOKEN   = os.environ.get("GITLAB_TOKEN", "")
 
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent"
 
 SYSTEM_PROMPT = """You are RepoTerrain's codebase intelligence agent.
 
