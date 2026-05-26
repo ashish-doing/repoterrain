@@ -28,17 +28,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve frontend static files
-import os
-frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
-if os.path.exists(frontend_path):
-    from fastapi.staticfiles import StaticFiles
-    from fastapi.responses import FileResponse
-    app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+# Serve frontend
+from fastapi.responses import HTMLResponse
 
-    @app.get("/app")
-    async def serve_frontend():
-        return FileResponse(os.path.join(frontend_path, "index.html"))
+@app.get("/app")
+async def serve_frontend():
+    path = os.path.join(os.path.dirname(__file__), "index.html")
+    with open(path) as f:
+        return HTMLResponse(f.read())
 
 terrain_cache: dict = {}
 

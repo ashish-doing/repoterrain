@@ -1,0 +1,1935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RepoTerrain — Codebase Intelligence</title>
+
+  <!-- Three.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- CSS3DRenderer (must load after three.min.js) -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS3DRenderer.js"></script>
+
+  <!-- MediaPipe Tasks Vision (hand tracking) -->
+  <script type="module">
+    import { GestureRecognizer, FilesetResolver, DrawingUtils }
+      from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js";
+    window._MPImports = { GestureRecognizer, FilesetResolver, DrawingUtils };
+  </script>
+
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #04050a;
+      --surface:   #0b0d17;
+      --border:    rgba(255,255,255,0.07);
+      --accent:    #00e5ff;
+      --accent2:   #ff6b35;
+      --hot:       #ff3e3e;
+      --cold:      #1a4fff;
+      --text:      #e8eaf6;
+      --dim:       rgba(232,234,246,0.45);
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+      --font-ui:   'DM Sans', system-ui, sans-serif;
+      --glow:      0 0 24px rgba(0,229,255,0.25);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-ui);
+      overflow: hidden;
+    }
+
+    /* ── Google Fonts ──────────────────────────────────────────── */
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap');
+
+    /* ── Canvas ────────────────────────────────────────────────── */
+    #canvas-3d {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    /* ── Webcam overlay ────────────────────────────────────────── */
+    #webcam-wrap {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 50;
+      width: 200px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      box-shadow: var(--glow);
+      display: none; /* shown when hand mode active */
+    }
+    #webcam { width: 100%; display: block; transform: scaleX(-1); }
+    #hand-canvas { position: absolute; inset: 0; width: 100%; height: 100%; transform: scaleX(-1); }
+    #hand-label {
+      position: absolute;
+      bottom: 6px; left: 50%;
+      transform: translateX(-50%);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--accent);
+      background: rgba(0,0,0,0.6);
+      padding: 2px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    /* ── Landing page ──────────────────────────────────────────── */
+    #landing {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    #landing-bg {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      opacity: 0.4;
+    }
+
+    .landing-inner {
+      position: relative;
+      z-index: 1;
+      max-width: 620px;
+      width: 100%;
+      padding: 0 28px;
+      text-align: center;
+    }
+
+    .logo-mark {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .logo-icon {
+      width: 48px; height: 48px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
+      box-shadow: 0 0 32px rgba(0,229,255,0.3);
+    }
+    .logo-text {
+      font-family: var(--font-mono);
+      font-size: 26px;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+    }
+    .logo-text span { color: var(--accent); }
+
+    .hero-title {
+      font-size: 36px;
+      font-weight: 600;
+      line-height: 1.2;
+      color: var(--text);
+      margin-bottom: 16px;
+      letter-spacing: -0.5px;
+    }
+    .hero-accent {
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub {
+      font-size: 15px;
+      color: var(--dim);
+      line-height: 1.7;
+      margin-bottom: 28px;
+    }
+
+    .feature-pills {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 32px;
+    }
+    .fpill {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 6px 14px;
+      font-size: 12px;
+      color: var(--dim);
+      font-family: var(--font-mono);
+    }
+
+    .url-form {
+      display: flex;
+      align-items: center;
+      background: var(--surface);
+      border: 1px solid rgba(0,229,255,0.3);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 0 40px rgba(0,229,255,0.1);
+      margin-bottom: 16px;
+    }
+    .url-prefix {
+      padding: 0 0 0 18px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+    .url-form input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      padding: 18px 12px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text);
+    }
+    .url-form input::placeholder { color: var(--dim); }
+    .url-form button {
+      background: linear-gradient(135deg, var(--accent), #00b8d4);
+      border: none;
+      padding: 18px 28px;
+      color: #04050a;
+      font-family: var(--font-ui);
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: opacity 0.15s;
+      white-space: nowrap;
+    }
+    .url-form button:hover { opacity: 0.9; }
+    .url-form button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-arrow { font-size: 18px; }
+
+    .demo-links {
+      font-size: 12px;
+      color: var(--dim);
+      margin-bottom: 28px;
+    }
+    .demo-links a {
+      color: var(--accent);
+      text-decoration: none;
+      cursor: pointer;
+      margin: 0 6px;
+      opacity: 0.8;
+      transition: opacity 0.15s;
+    }
+    .demo-links a:hover { opacity: 1; }
+
+    .progress-wrap { display: none; }
+    .progress-steps {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .pstep {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--dim);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      padding: 5px 12px;
+      border-radius: 100px;
+      transition: all 0.3s;
+    }
+    .pstep.active {
+      color: var(--accent);
+      border-color: rgba(0,229,255,0.4);
+      background: rgba(0,229,255,0.08);
+    }
+    .pstep.done {
+      color: #4caf50;
+      border-color: rgba(76,175,80,0.3);
+    }
+    .progress-bar-bg {
+      height: 2px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      width: 0%;
+      transition: width 0.5s ease;
+    }
+    .progress-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--dim);
+    }
+
+    .landing-footer {
+      position: absolute;
+      bottom: 24px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.2);
+      z-index: 1;
+    }
+    .landing-footer strong { color: rgba(255,255,255,0.4); }
+
+    /* ── HUD (shown during terrain view) ──────────────────────── */
+    #hud {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+      display: none;
+    }
+
+    /* Top bar */
+    .hud-top {
+      position: absolute;
+      top: 20px; left: 20px; right: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      pointer-events: auto;
+    }
+
+    .repo-badge {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--accent);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 340px;
+    }
+
+    .stat-pill {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--dim);
+    }
+    .stat-pill strong { color: var(--text); }
+
+    .hud-top-right {
+      margin-left: auto;
+      display: flex;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      pointer-events: auto;
+      transition: border-color 0.15s;
+      font-size: 16px;
+    }
+    .icon-btn:hover { border-color: var(--accent); }
+    .icon-btn.active { border-color: var(--accent); background: rgba(0,229,255,0.1); }
+
+    /* Legend */
+    .hud-legend {
+      position: absolute;
+      bottom: 24px;
+      left: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      pointer-events: auto;
+      min-width: 180px;
+    }
+    .legend-title {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--dim);
+      margin-bottom: 10px;
+    }
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* Gesture guide */
+    .hud-gestures {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      pointer-events: auto;
+      min-width: 180px;
+      font-size: 12px;
+    }
+    .gesture-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      color: var(--dim);
+    }
+    .gesture-icon { font-size: 16px; flex-shrink: 0; }
+    .gesture-row strong { color: var(--text); }
+
+    /* ── File info panel (right side) ─────────────────────────── */
+    #file-panel {
+      position: fixed;
+      top: 72px;
+      right: 20px;
+      width: 320px;
+      z-index: 30;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      display: none;
+      pointer-events: auto;
+    }
+
+    .file-panel-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .file-panel-name {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--accent);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 240px;
+    }
+    .file-panel-close {
+      cursor: pointer;
+      color: var(--dim);
+      font-size: 18px;
+      line-height: 1;
+    }
+    .file-panel-close:hover { color: var(--text); }
+
+    .file-meta-row {
+      display: flex;
+      gap: 8px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .file-meta-chip {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.06);
+      color: var(--dim);
+    }
+    .file-meta-chip.lang { color: var(--accent); }
+
+    .heat-bar {
+      margin: 0 16px 12px;
+      margin-top: 10px;
+    }
+    .heat-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--dim);
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .heat-track {
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      overflow: hidden;
+    }
+    .heat-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--cold), var(--hot));
+    }
+
+    /* ── Agent chat overlay ────────────────────────────────────── */
+    #agent-panel {
+      position: fixed;
+      left: 20px;
+      top: 72px;
+      width: 340px;
+      z-index: 30;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      display: none;
+      pointer-events: auto;
+      max-height: calc(100vh - 100px);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .agent-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .agent-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2s ease infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+    .agent-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .agent-model {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--dim);
+    }
+
+    .agent-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 380px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    .msg {
+      font-size: 13px;
+      line-height: 1.55;
+      border-radius: 8px;
+      padding: 10px 12px;
+      max-width: 100%;
+    }
+    .msg.user {
+      background: rgba(0,229,255,0.08);
+      border: 1px solid rgba(0,229,255,0.15);
+      color: var(--text);
+      align-self: flex-end;
+      max-width: 85%;
+    }
+    .msg.agent {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .msg.agent .msg-label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+    .action-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(255,107,53,0.12);
+      border: 1px solid rgba(255,107,53,0.3);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--accent2);
+      margin-top: 6px;
+    }
+
+    .agent-input-row {
+      display: flex;
+      gap: 0;
+      border-top: 1px solid var(--border);
+    }
+    .agent-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      padding: 12px 14px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text);
+    }
+    .agent-input::placeholder { color: var(--dim); }
+    .agent-send {
+      background: var(--accent);
+      border: none;
+      padding: 12px 16px;
+      color: var(--bg);
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .agent-send:hover { opacity: 0.85; }
+
+    .thinking {
+      display: flex;
+      gap: 4px;
+      padding: 4px 0;
+    }
+    .thinking span {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: bounce 1.2s ease infinite;
+    }
+    .thinking span:nth-child(2) { animation-delay: 0.2s; }
+    .thinking span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce {
+      0%, 80%, 100% { transform: translateY(0); }
+      40% { transform: translateY(-6px); }
+    }
+
+    /* ── Tooltip on hover ──────────────────────────────────────── */
+    #tooltip {
+      position: fixed;
+      z-index: 40;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text);
+      pointer-events: none;
+      display: none;
+      max-width: 260px;
+    }
+    #tooltip .t-path { color: var(--accent); font-size: 10px; margin-bottom: 2px; }
+    #tooltip .t-lang { color: var(--dim); }
+
+    /* ── Responsive & transitions ──────────────────────────────── */
+    .fade-in { animation: fadeIn 0.35s ease forwards; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── CSS3D Renderer overlay ────────────────────────────────── */
+    #css3d-container {
+      position: fixed;
+      inset: 0;
+      z-index: 1; /* above WebGL canvas, below HUD */
+      pointer-events: none; /* let WebGL canvas get mouse events for orbit */
+    }
+    /* cards themselves need pointer events */
+    #css3d-container .node-card { pointer-events: auto; }
+
+    /* ── File preview cards (CSS3D nodes) ──────────────────────── */
+    .node-card {
+      width: 160px;
+      background: rgba(11, 13, 23, 0.92);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 10px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+      backdrop-filter: blur(8px);
+      user-select: none;
+      /* card faces camera — CSS3D handles the 3D transform */
+    }
+    .node-card:hover {
+      border-color: rgba(0,229,255,0.55);
+      box-shadow: 0 0 18px rgba(0,229,255,0.2);
+      transform: scale(1.06);
+    }
+    .node-card.selected {
+      border-color: #00e5ff;
+      box-shadow: 0 0 28px rgba(0,229,255,0.45);
+    }
+
+    /* Top strip — language color bar */
+    .card-lang-bar {
+      height: 3px;
+      width: 100%;
+    }
+
+    /* Header row: icon + filename */
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 10px 5px;
+    }
+    .card-lang-icon {
+      font-size: 13px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .card-filename {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: #e8eaf6;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 110px;
+    }
+
+    /* Code preview lines */
+    .card-preview {
+      padding: 0 10px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .code-line {
+      height: 5px;
+      border-radius: 3px;
+      background: rgba(255,255,255,0.07);
+      position: relative;
+      overflow: hidden;
+    }
+    .code-line::after {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; height: 100%;
+      border-radius: 3px;
+    }
+    /* syntax color stripes per language */
+    .lang-python .code-line:nth-child(odd)::after  { background: #3572A5; width: 60%; }
+    .lang-python .code-line:nth-child(even)::after { background: #FFD43B; width: 40%; }
+    .lang-javascript .code-line:nth-child(odd)::after  { background: #f1e05a; width: 55%; }
+    .lang-javascript .code-line:nth-child(even)::after { background: #e8724a; width: 35%; }
+    .lang-typescript .code-line:nth-child(odd)::after  { background: #3178c6; width: 65%; }
+    .lang-typescript .code-line:nth-child(even)::after { background: #00e5ff; width: 38%; }
+    .lang-go .code-line:nth-child(odd)::after  { background: #00ADD8; width: 50%; }
+    .lang-go .code-line:nth-child(even)::after { background: #ffffff44; width: 42%; }
+    .lang-rust .code-line:nth-child(odd)::after  { background: #DEA584; width: 58%; }
+    .lang-rust .code-line:nth-child(even)::after { background: #d4732a; width: 30%; }
+    .lang-yaml .code-line:nth-child(odd)::after  { background: #cb171e; width: 45%; }
+    .lang-yaml .code-line:nth-child(even)::after { background: #6794a7; width: 60%; }
+    .lang-markdown .code-line:nth-child(odd)::after  { background: #ffffff66; width: 80%; }
+    .lang-markdown .code-line:nth-child(even)::after { background: #ffffff33; width: 55%; }
+    .lang-shell .code-line:nth-child(odd)::after  { background: #89e051; width: 52%; }
+    .lang-shell .code-line:nth-child(even)::after { background: #4eaa25; width: 35%; }
+    .lang-other .code-line:nth-child(odd)::after  { background: #ffffff44; width: 50%; }
+    .lang-other .code-line:nth-child(even)::after { background: #ffffff22; width: 35%; }
+
+    /* Footer: heat bar */
+    .card-footer {
+      border-top: 1px solid rgba(255,255,255,0.06);
+      padding: 5px 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .card-heat-track {
+      flex: 1;
+      height: 3px;
+      border-radius: 2px;
+      background: rgba(255,255,255,0.08);
+      overflow: hidden;
+    }
+    .card-heat-fill {
+      height: 100%;
+      border-radius: 2px;
+    }
+    .card-heat-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8px;
+      color: rgba(232,234,246,0.4);
+      white-space: nowrap;
+    }
+
+    /* Cluster label that floats above cluster center */
+    .cluster-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: rgba(0,229,255,0.7);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      white-space: nowrap;
+      pointer-events: none;
+      text-shadow: 0 0 12px rgba(0,229,255,0.5);
+    }
+  </style>
+</head>
+<body>
+
+<!-- 3D Canvas (WebGL — edges, particles, lights) -->
+<canvas id="canvas-3d"></canvas>
+<!-- CSS3D container (file preview cards float here) -->
+<div id="css3d-container"></div>
+
+<!-- ── Landing / URL input ───────────────────────────────────── -->
+<div id="landing">
+  <!-- Animated background grid -->
+  <canvas id="landing-bg"></canvas>
+
+  <div class="landing-inner">
+    <!-- Logo -->
+    <div class="logo-mark fade-in">
+      <div class="logo-icon">⛰</div>
+      <div class="logo-text">Repo<span>Terrain</span></div>
+    </div>
+
+    <!-- Hero text -->
+    <h1 class="hero-title fade-in" style="animation-delay:0.1s">
+      Your codebase has a shape.<br>
+      <span class="hero-accent">Now you can see it.</span>
+    </h1>
+
+    <p class="hero-sub fade-in" style="animation-delay:0.2s">
+      Paste any GitLab repo. Watch it become a living 3D terrain.<br>
+      Navigate with your hands. Ask AI anything. Create issues in seconds.
+    </p>
+
+    <!-- Feature pills -->
+    <div class="feature-pills fade-in" style="animation-delay:0.3s">
+      <div class="fpill">⛰ Semantic 3D terrain</div>
+      <div class="fpill">✋ Hand gesture nav</div>
+      <div class="fpill">🤖 Gemini agent</div>
+      <div class="fpill">🦊 GitLab MCP</div>
+    </div>
+
+    <!-- URL input -->
+    <div class="url-form fade-in" style="animation-delay:0.4s">
+      <span class="url-prefix">gitlab.com/</span>
+      <input id="repo-input" type="text"
+             placeholder="org/repository"
+             value="gitlab-org/gitlab-runner" />
+      <button id="ingest-btn" onclick="startIngest()">
+        <span id="btn-text">Map Terrain</span>
+        <span class="btn-arrow">→</span>
+      </button>
+    </div>
+
+    <!-- Quick examples -->
+    <div class="demo-links fade-in" style="animation-delay:0.5s">
+      Try:
+      <a onclick="setDemo('gitlab-org/gitlab-runner')">gitlab-runner</a>
+      <a onclick="setDemo('inkscape/inkscape')">Inkscape</a>
+      <a onclick="setDemo('gnome/gnome-shell')">GNOME Shell</a>
+      <a onclick="setDemo('fdroid/fdroidclient')">F-Droid</a>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-steps" id="progress-steps">
+        <div class="pstep" id="ps1">📥 Ingesting repo…</div>
+        <div class="pstep" id="ps2">🧠 Embedding files…</div>
+        <div class="pstep" id="ps3">🗺 Building terrain…</div>
+        <div class="pstep" id="ps4">✨ Launching…</div>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progress-fill"></div>
+      </div>
+      <div class="progress-label" id="progress-label">Starting pipeline…</div>
+    </div>
+  </div>
+
+  <!-- Bottom badge -->
+  <div class="landing-footer fade-in" style="animation-delay:0.6s">
+    Built with
+    <img src="https://www.gstatic.com/devrel-devsite/prod/v45f61267e6301b3f7aa4d489f9e9ca5e1fb3b04b4dca7ba9a1a98b7b1a5f3c4/cloud/images/cloud-logo.svg"
+         onerror="this.style.display='none'" style="height:14px;vertical-align:middle;margin:0 4px">
+    <strong>Gemini</strong> · <strong>Vertex AI</strong> · <strong>GitLab MCP</strong>
+  </div>
+</div>
+
+<!-- ── HUD ───────────────────────────────────────────────────── -->
+<div id="hud">
+  <div class="hud-top">
+    <div class="repo-badge" id="hud-repo">gitlab.com/…</div>
+    <div class="stat-pill"><strong id="stat-files">0</strong> files</div>
+    <div class="stat-pill"><strong id="stat-clusters">0</strong> clusters</div>
+    <div class="hud-top-right">
+      <div class="icon-btn" id="btn-agent" title="Open Agent" onclick="togglePanel('agent')">🤖</div>
+      <div class="icon-btn" id="btn-hand" title="Enable Hand Tracking" onclick="toggleHandTracking()">✋</div>
+      <div class="icon-btn" title="Reset View" onclick="resetCamera()">⌂</div>
+      <div class="icon-btn" title="Back to Search" onclick="resetToLanding()">←</div>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="hud-legend">
+    <div class="legend-title">Activity Heat</div>
+    <div class="legend-row">
+      <div class="legend-dot" style="background:#ff3e3e"></div>Hot zone (active)
+    </div>
+    <div class="legend-row">
+      <div class="legend-dot" style="background:#ff9d00"></div>Warm (recent)
+    </div>
+    <div class="legend-row">
+      <div class="legend-dot" style="background:#1a4fff"></div>Cold zone (legacy)
+    </div>
+    <div class="legend-row" style="margin-top:6px;">
+      <div class="legend-dot" style="background:#ffffff;opacity:0.4"></div>File node
+    </div>
+  </div>
+
+  <!-- Gesture guide (bottom right, behind webcam if active) -->
+  <div class="hud-gestures" id="gesture-guide" style="display:none">
+    <div class="legend-title">Hand Gestures</div>
+    <div class="gesture-row"><span class="gesture-icon">🖐</span> Open palm — <strong>fly</strong></div>
+    <div class="gesture-row"><span class="gesture-icon">🤏</span> Pinch — <strong>zoom</strong></div>
+    <div class="gesture-row"><span class="gesture-icon">☝️</span> Point — <strong>select file</strong></div>
+    <div class="gesture-row"><span class="gesture-icon">✊</span> Fist — <strong>grab & rotate</strong></div>
+  </div>
+</div>
+
+<!-- ── File Info Panel ────────────────────────────────────────── -->
+<div id="file-panel">
+  <div class="file-panel-header">
+    <div class="file-panel-name" id="fp-name">–</div>
+    <div class="file-panel-close" onclick="closeFilePanel()">×</div>
+  </div>
+  <div class="file-meta-row">
+    <div class="file-meta-chip lang" id="fp-lang">–</div>
+    <div class="file-meta-chip" id="fp-size">– chars</div>
+  </div>
+  <div class="heat-bar">
+    <div class="heat-label">
+      <span>Activity heat</span>
+      <span id="fp-heat-pct">–</span>
+    </div>
+    <div class="heat-track">
+      <div class="heat-fill" id="fp-heat-fill" style="width:0%"></div>
+    </div>
+  </div>
+  <div style="padding: 0 16px 14px">
+    <button onclick="askAgent('Explain this file and its role in the codebase')"
+      style="width:100%;padding:10px;background:rgba(0,229,255,0.1);border:1px solid rgba(0,229,255,0.25);border-radius:8px;color:var(--accent);font-size:12px;cursor:pointer;font-family:var(--font-mono)">
+      🤖 Ask agent about this file
+    </button>
+  </div>
+</div>
+
+<!-- ── Agent Panel ────────────────────────────────────────────── -->
+<div id="agent-panel" style="display:none">
+  <div class="agent-header">
+    <div class="agent-dot"></div>
+    <div class="agent-title">Gemini Agent</div>
+    <div class="agent-model">gemini-2.0-flash</div>
+  </div>
+  <div class="agent-messages" id="agent-messages">
+    <div class="msg agent">
+      <div class="msg-label">Agent</div>
+      Welcome! I can see your codebase terrain. Point at any file cluster or ask me anything.
+      <br><br>Try: <em>"What's the most complex module?"</em> or <em>"Create an issue for the cold zones"</em>
+    </div>
+  </div>
+  <div class="agent-input-row">
+    <input class="agent-input" id="agent-input" placeholder="Ask about the codebase…"
+           onkeydown="if(event.key==='Enter') sendAgentQuery()" />
+    <button class="agent-send" onclick="sendAgentQuery()">↑</button>
+  </div>
+</div>
+
+<!-- ── Webcam (hand tracking) ─────────────────────────────────── -->
+<div id="webcam-wrap">
+  <video id="webcam" autoplay playsinline muted></video>
+  <canvas id="hand-canvas"></canvas>
+  <div id="hand-label">✋ detecting…</div>
+</div>
+
+<!-- ── Tooltip ───────────────────────────────────────────────── -->
+<div id="tooltip">
+  <div class="t-path" id="tt-path">–</div>
+  <div class="t-lang" id="tt-lang">–</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  RepoTerrain — Frontend Engine
+// ═══════════════════════════════════════════════════════════════
+
+const API_BASE = window.location.hostname === 'localhost'
+  ? 'http://localhost:8080'
+  : 'https://repoterrain-production.up.railway.app';
+
+let scene, camera, renderer, css3dRenderer;
+let terrainNodes = [], terrainEdges = [];
+let nodeMeshes = [], edgeLines = [], css3dObjects = [], clusterLabels = [];
+let selectedNode = null;
+let sessionId = null;
+let wsConn = null;
+let handTrackingActive = false;
+let frameId = null;
+
+// ── Three.js Init ─────────────────────────────────────────────
+
+function initThreeJS() {
+  const canvas = document.getElementById('canvas-3d');
+  scene = new THREE.Scene();
+
+  // Camera
+  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 1000);
+  camera.position.set(0, 200, 500);
+  camera.lookAt(0, 0, 0);
+
+  // WebGL renderer (edges, particles, glow rings)
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setClearColor(0x04050a, 1);
+
+  // CSS3D renderer (file preview cards)
+  css3dRenderer = new THREE.CSS3DRenderer();
+  css3dRenderer.setSize(window.innerWidth, window.innerHeight);
+  css3dRenderer.domElement.id = 'css3d-container';
+  css3dRenderer.domElement.style.position = 'fixed';
+  css3dRenderer.domElement.style.inset = '0';
+  css3dRenderer.domElement.style.zIndex = '1';
+  // Replace placeholder div with actual renderer dom
+  const placeholder = document.getElementById('css3d-container');
+  placeholder.replaceWith(css3dRenderer.domElement);
+
+  // Lights
+  const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+  scene.add(ambient);
+  const dirLight = new THREE.DirectionalLight(0x00e5ff, 0.6);
+  dirLight.position.set(200, 400, 200);
+  scene.add(dirLight);
+  const fillLight = new THREE.DirectionalLight(0xff6b35, 0.2);
+  fillLight.position.set(-300, -100, -200);
+  scene.add(fillLight);
+
+  // Subtle grid
+  const grid = new THREE.GridHelper(1200, 30, 0x0a0c18, 0x0a0c18);
+  scene.add(grid);
+
+  setupOrbitControls();
+  window.addEventListener('resize', onResize);
+  renderLoop();
+  setupMousePick();
+}
+
+// ── Orbit controls (simple manual impl) ──────────────────────
+
+let isDragging = false, lastMouse = { x: 0, y: 0 };
+let spherical = { theta: 0, phi: Math.PI / 3, r: 500 };
+
+function setupOrbitControls() {
+  const canvas = document.getElementById('canvas-3d');
+
+  canvas.addEventListener('mousedown', e => {
+    isDragging = true;
+    lastMouse = { x: e.clientX, y: e.clientY };
+  });
+  window.addEventListener('mouseup', () => { isDragging = false; });
+  window.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    const dx = e.clientX - lastMouse.x;
+    const dy = e.clientY - lastMouse.y;
+    spherical.theta -= dx * 0.005;
+    spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi + dy * 0.005));
+    lastMouse = { x: e.clientX, y: e.clientY };
+    updateCamera();
+  });
+  canvas.addEventListener('wheel', e => {
+    spherical.r = Math.max(80, Math.min(2000, spherical.r + e.deltaY * 0.8));
+    updateCamera();
+  });
+
+  // Touch
+  let lastTouch = null;
+  canvas.addEventListener('touchstart', e => {
+    lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  });
+  canvas.addEventListener('touchmove', e => {
+    if (!lastTouch) return;
+    const dx = e.touches[0].clientX - lastTouch.x;
+    const dy = e.touches[0].clientY - lastTouch.y;
+    spherical.theta -= dx * 0.005;
+    spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi + dy * 0.005));
+    lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    updateCamera();
+  });
+}
+
+function updateCamera() {
+  const x = spherical.r * Math.sin(spherical.phi) * Math.sin(spherical.theta);
+  const y = spherical.r * Math.cos(spherical.phi);
+  const z = spherical.r * Math.sin(spherical.phi) * Math.cos(spherical.theta);
+  camera.position.set(x, y, z);
+  camera.lookAt(0, 0, 0);
+}
+
+function resetCamera() {
+  spherical = { theta: 0, phi: Math.PI / 3, r: 500 };
+  updateCamera();
+}
+
+// ── Language config ───────────────────────────────────────────
+
+const LANG_CONFIG = {
+  python:     { icon: '🐍', color: '#3572A5', barColor: '#3572A5' },
+  javascript: { icon: '⚡', color: '#f1e05a', barColor: '#f1e05a' },
+  typescript: { icon: '🔷', color: '#3178c6', barColor: '#3178c6' },
+  react:      { icon: '⚛️', color: '#61dafb', barColor: '#61dafb' },
+  go:         { icon: '🐹', color: '#00ADD8', barColor: '#00ADD8' },
+  rust:       { icon: '⚙️', color: '#DEA584', barColor: '#DEA584' },
+  java:       { icon: '☕', color: '#b07219', barColor: '#b07219' },
+  ruby:       { icon: '💎', color: '#cc342d', barColor: '#cc342d' },
+  yaml:       { icon: '📋', color: '#cb171e', barColor: '#cb171e' },
+  markdown:   { icon: '📝', color: '#aaaaaa', barColor: '#aaaaaa' },
+  shell:      { icon: '💻', color: '#89e051', barColor: '#89e051' },
+  sql:        { icon: '🗄️', color: '#e38c00', barColor: '#e38c00' },
+  html:       { icon: '🌐', color: '#e34c26', barColor: '#e34c26' },
+  css:        { icon: '🎨', color: '#563d7c', barColor: '#563d7c' },
+  other:      { icon: '📄', color: '#666666', barColor: '#666666' },
+};
+
+function heatToColor(heat) {
+  const c = new THREE.Color();
+  if (heat < 0.5) {
+    c.lerpColors(new THREE.Color(0x1a4fff), new THREE.Color(0xff9d00), heat * 2);
+  } else {
+    c.lerpColors(new THREE.Color(0xff9d00), new THREE.Color(0xff3e3e), (heat - 0.5) * 2);
+  }
+  return c;
+}
+
+function heatToCss(heat) {
+  if (heat < 0.33) return '#1a4fff';
+  if (heat < 0.66) return '#ff9d00';
+  return '#ff3e3e';
+}
+
+// ── Card builder ──────────────────────────────────────────────
+
+function buildCardElement(node) {
+  const cfg = LANG_CONFIG[node.language] || LANG_CONFIG.other;
+  const heatPct = Math.round(node.heat * 100);
+  const heatColor = heatToCss(node.heat);
+  const shortName = node.name.length > 18 ? node.name.substring(0, 16) + '…' : node.name;
+
+  // Number of fake code lines based on file size
+  const lineCount = 3 + Math.floor(node.size * 5);
+
+  const div = document.createElement('div');
+  div.className = `node-card lang-${node.language}`;
+  div.dataset.nodeId = node.id;
+
+  // Language color bar at top
+  const bar = document.createElement('div');
+  bar.className = 'card-lang-bar';
+  bar.style.background = cfg.barColor;
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'card-header';
+  header.innerHTML = `
+    <span class="card-lang-icon">${cfg.icon}</span>
+    <span class="card-filename" title="${node.path}">${shortName}</span>
+  `;
+
+  // Code preview (fake syntax-colored lines)
+  const preview = document.createElement('div');
+  preview.className = 'card-preview';
+  for (let i = 0; i < Math.min(lineCount, 7); i++) {
+    const line = document.createElement('div');
+    line.className = 'code-line';
+    // Vary line widths for realism
+    const widths = [75, 55, 90, 40, 70, 60, 85];
+    line.style.width = widths[i % widths.length] + '%';
+    preview.appendChild(line);
+  }
+
+  // Footer — heat bar
+  const footer = document.createElement('div');
+  footer.className = 'card-footer';
+  footer.innerHTML = `
+    <div class="card-heat-track">
+      <div class="card-heat-fill" style="width:${heatPct}%;background:${heatColor}"></div>
+    </div>
+    <span class="card-heat-label">${heatPct}%</span>
+  `;
+
+  div.appendChild(bar);
+  div.appendChild(header);
+  div.appendChild(preview);
+  div.appendChild(footer);
+
+  // Click handler on the card itself
+  div.addEventListener('click', (e) => {
+    e.stopPropagation();
+    selectNode(node);
+  });
+
+  return div;
+}
+
+// ── Terrain Building ──────────────────────────────────────────
+
+function buildTerrain(nodes, edges) {
+  clearTerrain();
+  terrainNodes = nodes;
+  terrainEdges = edges;
+
+  window._nodeMap = {};
+  nodes.forEach(n => window._nodeMap[n.id] = n);
+
+  const SPREAD = 280;
+
+  nodes.forEach(node => {
+    const x = node.x * SPREAD;
+    const y = node.y * SPREAD * 0.2;
+    const z = node.z * SPREAD;
+
+    node.worldX = x;
+    node.worldY = y;
+    node.worldZ = z;
+
+    // ── CSS3D card ────────────────────────────────────────────
+    const cardEl = buildCardElement(node);
+    const css3dObj = new THREE.CSS3DObject(cardEl);
+    css3dObj.position.set(x, y, z);
+    css3dObj.scale.set(0.22, 0.22, 0.22); // smaller cards, less overlap
+    css3dObj.userData = { nodeId: node.id, node };
+    scene.add(css3dObj);
+    css3dObjects.push(css3dObj);
+
+    // ── Invisible proxy mesh for raycasting ───────────────────
+    const proxyGeo = new THREE.PlaneGeometry(36, 36);
+    const proxyMat = new THREE.MeshBasicMaterial({
+      transparent: true, opacity: 0,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    const proxy = new THREE.Mesh(proxyGeo, proxyMat);
+    proxy.position.set(x, y, z);
+    proxy.userData = { ...node };
+    scene.add(proxy);
+    nodeMeshes.push(proxy);
+  });
+
+  // ── Edges (WebGL lines) ───────────────────────────────────
+  const nodeById = {};
+  nodeMeshes.forEach(m => nodeById[m.userData.id] = m);
+
+  edges.forEach(edge => {
+    const src = nodeById[edge.source];
+    const tgt = nodeById[edge.target];
+    if (!src || !tgt) return;
+
+    const points = [src.position.clone(), tgt.position.clone()];
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+    const lineMat = new THREE.LineBasicMaterial({
+      color: 0x1e3a5a,
+      transparent: true,
+      opacity: 0.5,
+    });
+    const line = new THREE.Line(lineGeo, lineMat);
+    scene.add(line);
+    edgeLines.push(line);
+  });
+
+  // ── Cluster labels ────────────────────────────────────────
+  buildClusterLabels(nodes);
+
+  // ── Background particles ──────────────────────────────────
+  addParticles(nodes.length);
+
+  // HUD stats
+  document.getElementById('stat-files').textContent = nodes.length;
+  document.getElementById('stat-clusters').textContent = Math.ceil(nodes.length / 8);
+}
+
+function buildClusterLabels(nodes) {
+  // Group nodes into rough clusters by proximity, label each centroid
+  const clusters = {};
+  nodes.forEach(n => {
+    // Use demo module name if available in path, else bucket by position
+    const parts = n.path.split('/');
+    const mod = parts.length >= 2 ? parts[parts.length - 2] : 'core';
+    if (!clusters[mod]) clusters[mod] = [];
+    clusters[mod].push(n);
+  });
+
+  Object.entries(clusters).forEach(([name, members]) => {
+    if (members.length < 2) return;
+    const cx = members.reduce((s, n) => s + n.worldX, 0) / members.length;
+    const cy = members.reduce((s, n) => s + n.worldY, 0) / members.length;
+    const cz = members.reduce((s, n) => s + n.worldZ, 0) / members.length;
+
+    const label = document.createElement('div');
+    label.className = 'cluster-label';
+    label.textContent = name.toUpperCase();
+
+    const css3dLabel = new THREE.CSS3DObject(label);
+    css3dLabel.position.set(cx, cy + 55, cz);
+    css3dLabel.scale.set(0.5, 0.5, 0.5);
+    scene.add(css3dLabel);
+    clusterLabels.push(css3dLabel);
+  });
+}
+
+function addParticles(fileCount) {
+  const count = Math.min(fileCount * 5, 1000);
+  const geo = new THREE.BufferGeometry();
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    positions[i * 3]     = (Math.random() - 0.5) * 1400;
+    positions[i * 3 + 1] = (Math.random() - 0.5) * 500;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 1400;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const mat = new THREE.PointsMaterial({
+    color: 0x112244,
+    size: 1.5,
+    transparent: true,
+    opacity: 0.5,
+  });
+  const particles = new THREE.Points(geo, mat);
+  scene.add(particles);
+  edgeLines.push(particles); // cleaned up with edges
+}
+
+function clearTerrain() {
+  // Remove WebGL objects
+  [...nodeMeshes, ...edgeLines].forEach(obj => scene.remove(obj));
+  nodeMeshes = [];
+  edgeLines = [];
+
+  // Remove CSS3D objects
+  [...css3dObjects, ...clusterLabels].forEach(obj => scene.remove(obj));
+  css3dObjects = [];
+  clusterLabels = [];
+}
+
+// ── Render loop ───────────────────────────────────────────────
+
+let t = 0;
+function renderLoop() {
+  frameId = requestAnimationFrame(renderLoop);
+  t += 0.006;
+
+  // Billboard: make every card AND its proxy always face the camera
+  const camPos = camera.position;
+  css3dObjects.forEach((obj, i) => {
+    // Gentle float
+    const floatY = obj.userData.node.worldY + Math.sin(t + i * 0.4) * 3;
+    obj.position.y = floatY;
+
+    // Face camera (billboard)
+    obj.lookAt(camPos);
+
+    // Keep proxy in sync
+    if (nodeMeshes[i]) {
+      nodeMeshes[i].position.y = floatY;
+      nodeMeshes[i].lookAt(camPos);
+    }
+  });
+
+  // Cluster labels also billboard
+  clusterLabels.forEach(lbl => lbl.lookAt(camPos));
+
+  renderer.render(scene, camera);
+  css3dRenderer.render(scene, camera);
+}
+
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  css3dRenderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// ── Mouse picking ─────────────────────────────────────────────
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let hovered = null;
+
+function setupMousePick() {
+  const canvas = document.getElementById('canvas-3d');
+  canvas.addEventListener('mousemove', e => {
+    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    checkHover(e.clientX, e.clientY);
+  });
+  canvas.addEventListener('click', e => {
+    if (isDragging) return;
+    pickNode(e.clientX, e.clientY);
+  });
+}
+
+function checkHover(cx, cy) {
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(nodeMeshes);
+  const tooltip = document.getElementById('tooltip');
+
+  if (hits.length > 0) {
+    const node = hits[0].object.userData;
+    if (hovered !== node) {
+      hovered = node;
+      document.getElementById('tt-path').textContent = node.path;
+      document.getElementById('tt-lang').textContent = `${node.language} · heat ${Math.round(node.heat * 100)}%`;
+      tooltip.style.display = 'block';
+    }
+    tooltip.style.left = (cx + 12) + 'px';
+    tooltip.style.top = (cy - 8) + 'px';
+  } else {
+    hovered = null;
+    tooltip.style.display = 'none';
+  }
+}
+
+function pickNode(cx, cy) {
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(nodeMeshes);
+  if (hits.length > 0) {
+    selectNode(hits[0].object.userData);
+  }
+}
+
+function selectNode(node) {
+  selectedNode = node;
+
+  // Remove selected class from all cards
+  document.querySelectorAll('.node-card').forEach(c => c.classList.remove('selected'));
+  // Add to this card
+  const card = document.querySelector(`.node-card[data-node-id="${node.id}"]`);
+  if (card) card.classList.add('selected');
+
+  // Update file panel
+  document.getElementById('fp-name').textContent = node.name;
+  document.getElementById('fp-lang').textContent = node.language;
+  document.getElementById('fp-size').textContent =
+    `${Math.round(node.size * 5000).toLocaleString()} chars`;
+  const heatPct = Math.round(node.heat * 100);
+  document.getElementById('fp-heat-pct').textContent = heatPct + '%';
+  document.getElementById('fp-heat-fill').style.width = heatPct + '%';
+
+  const panel = document.getElementById('file-panel');
+  panel.style.display = 'block';
+  panel.classList.add('fade-in');
+
+  flyTo(node.worldX, node.worldY, node.worldZ);
+
+  if (wsConn && wsConn.readyState === WebSocket.OPEN) {
+    wsConn.send(JSON.stringify({ type: 'gesture_select', file: node.path }));
+  }
+}
+
+function flyTo(x, y, z) {
+  const target = new THREE.Vector3(x, y, z);
+  const from = camera.position.clone();
+  const offset = new THREE.Vector3(0, 80, 150);
+  const dest = target.clone().add(offset);
+
+  let progress = 0;
+  function fly() {
+    progress += 0.03;
+    if (progress >= 1) return;
+    camera.position.lerpVectors(from, dest, easeInOut(progress));
+    camera.lookAt(target);
+    requestAnimationFrame(fly);
+  }
+  fly();
+}
+
+function easeInOut(t) {
+  return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+}
+
+function closeFilePanel() {
+  document.getElementById('file-panel').style.display = 'none';
+  selectedNode = null;
+  document.querySelectorAll('.node-card').forEach(c => c.classList.remove('selected'));
+}
+
+// ── API Integration ───────────────────────────────────────────
+
+async function startIngest() {
+  const input = document.getElementById('repo-input').value.trim();
+  let repoUrl = input.startsWith('http') ? input : 'https://gitlab.com/' + input;
+  if (!repoUrl.includes('gitlab.com')) {
+    alert('Please enter a valid GitLab repository path');
+    return;
+  }
+
+  const btn = document.getElementById('ingest-btn');
+  btn.disabled = true;
+  document.getElementById('btn-text').textContent = 'Mapping…';
+
+  document.getElementById('progress-wrap').style.display = 'block';
+
+  const steps = [
+    [10,  'ps1', 'Cloning repo via gitingest…'],
+    [35,  'ps2', 'Generating embeddings…'],
+    [65,  'ps3', 'Running UMAP 3D projection…'],
+    [85,  'ps4', 'Building terrain mesh…'],
+    [95,  null,  'Connecting Gemini agent…'],
+  ];
+
+  let stepIdx = 0, prevStep = null;
+  const interval = setInterval(() => {
+    if (stepIdx >= steps.length) return;
+    const [pct, stepId, label] = steps[stepIdx];
+    setProgress(pct, label);
+    if (prevStep) {
+      document.getElementById(prevStep)?.classList.remove('active');
+      document.getElementById(prevStep)?.classList.add('done');
+    }
+    if (stepId) { document.getElementById(stepId)?.classList.add('active'); prevStep = stepId; }
+    stepIdx++;
+  }, 1400);
+
+  try {
+    const res = await fetch(`${API_BASE}/ingest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repo_url: repoUrl, max_files: 150 }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    clearInterval(interval);
+    setProgress(100, 'Terrain ready!');
+    sessionId = data.session_id;
+    setTimeout(() => showTerrain(data, repoUrl), 600);
+  } catch (err) {
+    clearInterval(interval);
+    console.error('API error:', err);
+    // Show error clearly — don't silently fall back
+    setProgress(0, '❌ Backend error: ' + err.message);
+    document.getElementById('progress-label').style.color = '#ff4444';
+    document.getElementById('ingest-btn').disabled = false;
+    document.getElementById('btn-text').textContent = 'Map Terrain';
+    alert('Backend error: ' + err.message + '\n\nMake sure uvicorn is running on port 8080.');
+  }
+}
+
+function setProgress(pct, label) {
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = label;
+}
+
+function setDemo(path) {
+  document.getElementById('repo-input').value = path;
+}
+
+function showTerrain(data, repoUrl) {
+  document.getElementById('landing').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  document.getElementById('agent-panel').style.display = 'flex';
+  document.getElementById('hud-repo').textContent =
+    repoUrl.replace('https://gitlab.com/', '').substring(0, 45);
+  buildTerrain(data.nodes, data.edges);
+  if (sessionId) {
+    try {
+      const wsUrl = `${API_BASE.replace('http', 'ws')}/ws/${sessionId}`;
+      wsConn = new WebSocket(wsUrl);
+      wsConn.onmessage = handleWsMessage;
+    } catch(e) {}
+  }
+}
+
+// ── Animated landing background ───────────────────────────────
+
+function initLandingBg() {
+  const canvas = document.getElementById('landing-bg');
+  if (!canvas) return;
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const ctx = canvas.getContext('2d');
+
+  const dots = Array.from({length: 80}, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    r: Math.random() * 1.5 + 0.5,
+    vx: (Math.random() - 0.5) * 0.3,
+    vy: (Math.random() - 0.5) * 0.3,
+  }));
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < dots.length; i++) {
+      for (let j = i + 1; j < dots.length; j++) {
+        const dx = dots[i].x - dots[j].x, dy = dots[i].y - dots[j].y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < 130) {
+          ctx.beginPath();
+          ctx.strokeStyle = `rgba(0,229,255,${0.05*(1-dist/130)})`;
+          ctx.lineWidth = 0.5;
+          ctx.moveTo(dots[i].x, dots[i].y);
+          ctx.lineTo(dots[j].x, dots[j].y);
+          ctx.stroke();
+        }
+      }
+      ctx.beginPath();
+      ctx.arc(dots[i].x, dots[i].y, dots[i].r, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(0,229,255,0.4)';
+      ctx.fill();
+      dots[i].x += dots[i].vx; dots[i].y += dots[i].vy;
+      if (dots[i].x < 0 || dots[i].x > canvas.width) dots[i].vx *= -1;
+      if (dots[i].y < 0 || dots[i].y > canvas.height) dots[i].vy *= -1;
+    }
+    if (document.getElementById('landing').style.display !== 'none') requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// ── Agent Panel ───────────────────────────────────────────────
+
+function togglePanel(name) {
+  const el = document.getElementById(`${name}-panel`);
+  el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+}
+
+async function sendAgentQuery() {
+  const input = document.getElementById('agent-input');
+  const query = input.value.trim();
+  if (!query) return;
+  input.value = '';
+  askAgent(query);
+}
+
+async function askAgent(query) {
+  appendUserMessage(query);
+  showThinking();
+
+  const body = {
+    session_id: sessionId || 'demo',
+    query,
+    selected_file: selectedNode?.path || null,
+  };
+
+  try {
+    const res = await fetch(`${API_BASE}/agent/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    removeThinking();
+    appendAgentMessage(data.text, data.actions || []);
+  } catch {
+    // Demo mode fallback
+    removeThinking();
+    const demo = getDemoResponse(query, selectedNode?.path);
+    appendAgentMessage(demo, []);
+  }
+}
+
+function appendUserMessage(text) {
+  const msgs = document.getElementById('agent-messages');
+  const div = document.createElement('div');
+  div.className = 'msg user';
+  div.textContent = text;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function appendAgentMessage(text, actions) {
+  const msgs = document.getElementById('agent-messages');
+  const div = document.createElement('div');
+  div.className = 'msg agent fade-in';
+
+  let html = `<div class="msg-label">Gemini Agent</div>${escapeHtml(text)}`;
+  if (actions && actions.length > 0) {
+    actions.forEach(a => {
+      html += `<div class="action-chip">⚡ ${a.tool} ${a.result ? '· ' + escapeHtml(String(a.result).substring(0, 60)) : ''}</div>`;
+    });
+  }
+  div.innerHTML = html;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+let thinkingEl = null;
+function showThinking() {
+  const msgs = document.getElementById('agent-messages');
+  thinkingEl = document.createElement('div');
+  thinkingEl.className = 'msg agent';
+  thinkingEl.innerHTML = `<div class="msg-label">Agent</div><div class="thinking"><span></span><span></span><span></span></div>`;
+  msgs.appendChild(thinkingEl);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+function removeThinking() {
+  if (thinkingEl) { thinkingEl.remove(); thinkingEl = null; }
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ── Demo data generators ──────────────────────────────────────
+
+function generateDemoTerrain() {
+  const langs = ['python', 'javascript', 'typescript', 'go', 'rust', 'yaml', 'markdown', 'shell'];
+  const modules = ['auth', 'api', 'db', 'ui', 'utils', 'config', 'tests', 'docs'];
+  const nodes = [];
+
+  modules.forEach((mod) => {
+    const cx = (Math.random() - 0.5) * 1.6;
+    const cy = (Math.random() - 0.5) * 0.6;
+    const cz = (Math.random() - 0.5) * 1.6;
+    const clusterSize = 5 + Math.floor(Math.random() * 12);
+
+    for (let i = 0; i < clusterSize; i++) {
+      const lang = langs[Math.floor(Math.random() * langs.length)];
+      const ext = { python:'py', javascript:'js', typescript:'ts', go:'go',
+                    rust:'rs', yaml:'yml', markdown:'md', shell:'sh' }[lang];
+      const id = `${mod}_${i}`;
+      const node = {
+        id,
+        path: `src/${mod}/file_${i}.${ext}`,
+        name: `file_${i}.${ext}`,
+        x: cx + (Math.random() - 0.5) * 0.45,
+        y: cy + (Math.random() - 0.5) * 0.3,
+        z: cz + (Math.random() - 0.5) * 0.45,
+        heat: mod === 'auth' || mod === 'api'
+          ? 0.6 + Math.random() * 0.4
+          : Math.random() * 0.7,
+        size: 0.2 + Math.random() * 0.6,
+        language: lang,
+        worldX: 0, worldY: 0, worldZ: 0, // filled by buildTerrain
+      };
+      nodes.push(node);
+    }
+  });
+
+  const edges = [];
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const dist = Math.hypot(
+        nodes[i].x - nodes[j].x,
+        nodes[i].y - nodes[j].y,
+        nodes[i].z - nodes[j].z
+      );
+      if (dist < 0.22 && Math.random() > 0.5) {
+        edges.push({ source: nodes[i].id, target: nodes[j].id, distance: dist });
+      }
+    }
+  }
+
+  return { nodes, edges, meta: { repo_url: 'https://gitlab.com/demo/repo', file_count: nodes.length } };
+}
+
+function getDemoResponse(query, file) {
+  const responses = {
+    default: `I can see ${terrainNodes.length} files in this repository. The terrain clusters show clear separation between modules — the auth and API clusters are the most active (red/orange zones). The cold blue zones typically indicate legacy or rarely-touched code.`,
+    explain: file ? `**${file}** appears to be in a semantically rich cluster. Based on its position in the terrain, it's closely related to ${Math.floor(Math.random() * 5) + 2} other files. Its heat signature suggests moderate recent activity.` : `This cluster contains ${Math.floor(Math.random() * 8) + 3} related files that share semantic similarity in the embedding space.`,
+    issue: `I'll create a GitLab issue: "Tech Debt: Cold Zone Refactor Needed"\n\nDescription: Files in the bottom-left cluster show low activity scores and may benefit from review or consolidation.\n\n[Action: create_issue] Issue #247 created successfully`,
+    onboard: `Here's your onboarding guide:\n\n1. **Start at the red peaks** — these are your core modules\n2. **Auth cluster** (top-right) — handles all authentication\n3. **API cluster** (center) — main business logic lives here\n4. **Cold zones** — legacy code, approach with caution`,
+    sprint: `Last week's activity:\n• 12 commits across 8 files\n• Most active: auth/session.py, api/routes.ts\n• New files: tests/integration_test.go\n• The terrain has shifted — auth cluster gained 3 new nodes`,
+  };
+
+  const q = query.toLowerCase();
+  if (q.includes('explain') || q.includes('what is')) return responses.explain;
+  if (q.includes('issue')) return responses.issue;
+  if (q.includes('onboard')) return responses.onboard;
+  if (q.includes('sprint') || q.includes('week') || q.includes('commit')) return responses.sprint;
+  return responses.default;
+}
+
+// ── Hand Tracking ─────────────────────────────────────────────
+
+async function toggleHandTracking() {
+  const btn = document.getElementById('btn-hand');
+  const wrap = document.getElementById('webcam-wrap');
+  const guide = document.getElementById('gesture-guide');
+
+  if (handTrackingActive) {
+    handTrackingActive = false;
+    btn.classList.remove('active');
+    wrap.style.display = 'none';
+    guide.style.display = 'none';
+    return;
+  }
+
+  handTrackingActive = true;
+  btn.classList.add('active');
+  wrap.style.display = 'block';
+  guide.style.display = 'block';
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    const video = document.getElementById('webcam');
+    video.srcObject = stream;
+    await video.play();
+
+    // Wait for MediaPipe to load
+    await new Promise(r => setTimeout(r, 500));
+
+    if (!window._MPImports) {
+      document.getElementById('hand-label').textContent = '⚠ MediaPipe loading…';
+      return;
+    }
+
+    const { GestureRecognizer, FilesetResolver } = window._MPImports;
+    const vision = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+    );
+    const recognizer = await GestureRecognizer.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task",
+        delegate: "GPU",
+      },
+      runningMode: "VIDEO",
+      numHands: 1,
+    });
+
+    const handCanvas = document.getElementById('hand-canvas');
+    const ctx = handCanvas.getContext('2d');
+
+    function detectFrame() {
+      if (!handTrackingActive) return;
+
+      handCanvas.width = video.videoWidth;
+      handCanvas.height = video.videoHeight;
+
+      const results = recognizer.recognizeForVideo(video, performance.now());
+
+      ctx.clearRect(0, 0, handCanvas.width, handCanvas.height);
+
+      if (results.gestures.length > 0) {
+        const gesture = results.gestures[0][0].categoryName;
+        const landmarks = results.landmarks[0];
+
+        handleGesture(gesture, landmarks);
+
+        document.getElementById('hand-label').textContent =
+          { Open_Palm: '🖐 Fly', Closed_Fist: '✊ Rotate', Pointing_Up: '☝ Select',
+            Victory: '✌ Zoom', ILoveYou: '🤟 Action' }[gesture] || `✋ ${gesture}`;
+
+        // Draw landmarks
+        if (window._MPImports?.DrawingUtils) {
+          const du = new window._MPImports.DrawingUtils(ctx);
+          du.drawConnectors(landmarks, GestureRecognizer.HAND_CONNECTIONS,
+            { color: '#00e5ff', lineWidth: 1 });
+          du.drawLandmarks(landmarks, { color: '#ff6b35', lineWidth: 1, radius: 2 });
+        }
+      } else {
+        document.getElementById('hand-label').textContent = '✋ detecting…';
+      }
+
+      requestAnimationFrame(detectFrame);
+    }
+
+    detectFrame();
+
+  } catch (err) {
+    document.getElementById('hand-label').textContent = '⚠ Camera denied';
+    console.warn('Hand tracking:', err);
+  }
+}
+
+function handleGesture(gesture, landmarks) {
+  if (!landmarks) return;
+
+  // Index fingertip position (landmark 8) — normalized 0-1
+  const tip = landmarks[8];
+  const nx = (tip.x - 0.5) * 2;  // -1 to 1
+  const ny = -(tip.y - 0.5) * 2; // -1 to 1 (inverted)
+
+  if (gesture === 'Open_Palm') {
+    // Fly: move camera based on palm center position
+    const palm = landmarks[9];
+    spherical.theta -= (palm.x - 0.5) * 0.04;
+    spherical.phi = Math.max(0.2, Math.min(Math.PI - 0.2,
+      spherical.phi + (palm.y - 0.4) * 0.03));
+    updateCamera();
+
+  } else if (gesture === 'Pointing_Up') {
+    // Point: raycast from fingertip position
+    mouse.x = nx;
+    mouse.y = ny;
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects(nodeMeshes);
+    if (hits.length > 0) {
+      selectNode(hits[0].object.userData);
+    }
+
+  } else if (gesture === 'Victory') {
+    // Pinch/Victory: zoom
+    const thumbTip = landmarks[4];
+    const indexTip = landmarks[8];
+    const pinchDist = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
+    spherical.r = Math.max(80, Math.min(2000, spherical.r + (pinchDist - 0.05) * 300));
+    updateCamera();
+  }
+}
+
+// ── UI helpers ────────────────────────────────────────────────
+
+function handleWsMessage(evt) {
+  try {
+    const msg = JSON.parse(evt.data);
+    if (msg.type === 'agent_response') appendAgentMessage(msg.text, msg.actions || []);
+  } catch(e) {}
+}
+
+function resetToLanding() {
+  clearTerrain();
+  document.getElementById('hud').style.display = 'none';
+  document.getElementById('agent-panel').style.display = 'none';
+  document.getElementById('file-panel').style.display = 'none';
+  document.getElementById('landing').style.display = 'flex';
+  document.getElementById('progress-wrap').style.display = 'none';
+  document.getElementById('ingest-btn').disabled = false;
+  document.getElementById('btn-text').textContent = 'Map Terrain';
+  if (wsConn) { wsConn.close(); wsConn = null; }
+  initLandingBg();
+}
+
+// ── Boot ──────────────────────────────────────────────────────
+
+window.addEventListener('load', () => {
+  initThreeJS();
+  initLandingBg();
+});
+</script>
+</body>
+</html>
