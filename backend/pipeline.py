@@ -1,7 +1,7 @@
 """
 RepoTerrain Pipeline
-GitLab API → sentence-transformers → UMAP 3D → terrain JSON
-No subprocess needed. Works on Windows with SelectorEventLoop.
+GitLab API → Gemini Embeddings → UMAP 3D → Terrain JSON
+Google Cloud Rapid Agent Hackathon
 """
 
 import os
@@ -17,14 +17,11 @@ import numpy as np
 import umap
 
 # ── Config ────────────────────────────────────────────────────
-USE_VERTEX_AI = os.environ.get("USE_VERTEX_AI", "false").lower() == "true"
-GCP_PROJECT   = os.environ.get("GCP_PROJECT", "")
-GCP_LOCATION  = os.environ.get("GCP_LOCATION", "us-central1")
-LOCAL_MODEL   = "all-MiniLM-L6-v2"
-CHUNK_SIZE    = 2000
-BATCH_SIZE    = 32
-UMAP_DIM      = 3
-MAX_FILES     = 150
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+CHUNK_SIZE     = 2000
+BATCH_SIZE     = 32
+UMAP_DIM       = 3
+MAX_FILES      = 150
 
 SKIP_EXTS = {
     '.png','.jpg','.jpeg','.gif','.svg','.ico','.woff','.woff2',
@@ -35,62 +32,48 @@ SKIP_DIRS = {
     'node_modules','__pycache__','.git','.venv','dist','build','vendor','.next',
 }
 
-def get_local_model():
-    pass  # no longer used
-
-
 # ── Step 1: Fetch repo tree + file contents via GitLab API ────
 
 def parse_gitlab_url(repo_url: str):
-    """Extract host, project_path from GitLab URL."""
     url = repo_url.rstrip('/')
-    # Handle https://gitlab.com/group/repo or https://gitlab.com/group/sub/repo
     match = re.match(r'https?://([^/]+)/(.+)', url)
     if not match:
         raise ValueError(f"Cannot parse GitLab URL: {repo_url}")
-    host = match.group(1)
-    path = match.group(2)
-    return host, path
+    return match.group(1), match.group(2)
 
 
-async def fetch_repo_files(repo_url: str, token: Optional[str] = None, max_files: int = MAX_FILES) -> dict:
-    """Fetch file tree and contents from GitLab API."""
+async def fetch_repo_files(repo_url: str, token: Optional[str] = None, max_files: int = MAX_FILES):
     host, project_path = parse_gitlab_url(repo_url)
     encoded = project_path.replace('/', '%2F')
     base = f"https://{host}/api/v4/projects/{encoded}"
-    headers = {}
-    if token:
-        headers["PRIVATE-TOKEN"] = token
+    headers = {"PRIVATE-TOKEN": token} if token else {}
 
     files = {}
     summary = f"Repository: {repo_url}"
 
     async with httpx.AsyncClient(timeout=60, headers=headers) as client:
-        # First verify project exists
         print(f"[pipeline] Checking project: {base}")
-        r = await client.get(f"{base}")
+        r = await client.get(base)
         if r.status_code == 404:
-            raise ValueError(f"Repo not found: {repo_url}. Make sure it's public or provide a token.")
+            raise ValueError(f"Repo not found: {repo_url}")
         if r.status_code != 200:
             raise ValueError(f"GitLab API error {r.status_code}: {r.text[:200]}")
 
         project_info = r.json()
         default_branch = project_info.get("default_branch", "main")
+        summary = f"Repository: {repo_url} | Branch: {default_branch} | Description: {project_info.get('description', '')}"
         print(f"[pipeline] Default branch: {default_branch}")
 
-        # Get file tree (recursive)
+        # Get file tree
         print(f"[pipeline] Fetching file tree...")
         all_items = []
         page = 1
         while len(all_items) < 500:
             r = await client.get(f"{base}/repository/tree", params={
-                "recursive": "true",
-                "per_page": 100,
-                "page": page,
-                "ref": default_branch,
+                "recursive": "true", "per_page": 100,
+                "page": page, "ref": default_branch,
             })
             if r.status_code != 200:
-                print(f"[pipeline] Tree error {r.status_code}: {r.text[:200]}")
                 break
             items = r.json()
             if not items:
@@ -102,19 +85,12 @@ async def fetch_repo_files(repo_url: str, token: Optional[str] = None, max_files
 
         print(f"[pipeline] Total tree items: {len(all_items)}")
 
-        # Filter to files only
-        file_paths = []
-        for item in all_items:
-            if item.get("type") != "blob":
-                continue
-            path = item["path"]
-            if not should_skip(path):
-                file_paths.append(path)
+        file_paths = [
+            item["path"] for item in all_items
+            if item.get("type") == "blob" and not should_skip(item["path"])
+        ][:max_files]
 
-        print(f"[pipeline] Filtered to {len(file_paths)} files, fetching content...")
-        file_paths = file_paths[:max_files]
-
-        # Fetch file contents in parallel batches
+        print(f"[pipeline] Fetching {len(file_paths)} files...")
         for i in range(0, len(file_paths), 10):
             batch = file_paths[i:i+10]
             tasks = [fetch_file_content(client, base, fp, default_branch) for fp in batch]
@@ -127,60 +103,13 @@ async def fetch_repo_files(repo_url: str, token: Optional[str] = None, max_files
             print(f"[pipeline] Fetched {min(i+10, len(file_paths))}/{len(file_paths)} files")
 
     print(f"[pipeline] Got {len(files)} files")
-    print(f"[pipeline] Sample paths: {list(files.keys())[:5]}")
     return files, summary
 
 
-async def fetch_file_content(client: httpx.AsyncClient, base: str, filepath: str, branch: str = "main") -> str:
-    """Fetch single file content via GitLab API."""
+async def fetch_file_content(client, base, filepath, branch="main"):
     encoded_path = filepath.replace('/', '%2F')
     r = await client.get(f"{base}/repository/files/{encoded_path}/raw", params={"ref": branch})
-    if r.status_code == 200:
-        return r.text
-    return ""
-
-
-async def fallback_gitingest(repo_url: str, token: Optional[str]) -> dict:
-    """Last resort: use gitingest in a separate thread with new event loop."""
-    import concurrent.futures
-    def run_ingest():
-        import asyncio
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            from gitingest import ingest_async
-            return loop.run_until_complete(ingest_async(repo_url))
-        finally:
-            loop.close()
-
-    with concurrent.futures.ThreadPoolExecutor() as pool:
-        future = pool.submit(run_ingest)
-        summary, tree, content = future.result(timeout=120)
-
-    return parse_content_to_files(content, tree, MAX_FILES)
-
-
-def parse_content_to_files(content: str, tree: str, max_files: int) -> dict:
-    """Parse gitingest content format."""
-    files = {}
-    # Try multiple separator patterns
-    for pattern in [
-        r"-{48}\nFile:\s*(.+?)\n-{48}\n",
-        r"={10,}\nFile:\s*(.+?)\n={10,}\n",
-        r"#{3,}\s*File:\s*(.+?)\n",
-    ]:
-        parts = re.compile(pattern, re.MULTILINE).split(content)
-        if len(parts) > 1:
-            i = 1
-            while i + 1 < len(parts) and len(files) < max_files:
-                fp = parts[i].strip()
-                body = parts[i+1].strip()
-                if fp and not should_skip(fp) and len(body) > 10:
-                    files[fp] = body[:CHUNK_SIZE]
-                i += 2
-            if files:
-                break
-    return files
+    return r.text if r.status_code == 200 else ""
 
 
 def should_skip(filepath: str) -> bool:
@@ -188,48 +117,64 @@ def should_skip(filepath: str) -> bool:
     for part in parts[:-1]:
         if part in SKIP_DIRS:
             return True
-    for ext in SKIP_EXTS:
-        if filepath.endswith(ext):
-            return True
-    return False
+    return any(filepath.endswith(ext) for ext in SKIP_EXTS)
 
 
-# ── Step 2: Embed ─────────────────────────────────────────────
+# ── Step 2: Embed with Gemini text-embedding-004 ─────────────
 
 async def embed_files(files: dict) -> dict:
-    if USE_VERTEX_AI and GCP_PROJECT:
-        return await embed_vertex(files)
-    return await embed_local(files)
+    if GEMINI_API_KEY:
+        print(f"[pipeline] Using Gemini text-embedding-004 (Google Cloud AI)...")
+        return await embed_gemini(files)
+    print(f"[pipeline] No Gemini key — using TF-IDF fallback...")
+    return await embed_tfidf(files)
 
 
-async def embed_local(files: dict) -> dict:
+async def embed_gemini(files: dict) -> dict:
+    """Embed using Google's text-embedding-004 model via Gemini API."""
+    fps = list(files.keys())
+    embeddings = {}
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={GEMINI_API_KEY}"
+
+    # Process in batches to avoid rate limits
+    async with httpx.AsyncClient(timeout=60) as client:
+        for i, fp in enumerate(fps):
+            text = files[fp][:2000]
+            try:
+                r = await client.post(url, json={
+                    "model": "models/text-embedding-004",
+                    "content": {"parts": [{"text": text}]},
+                    "taskType": "RETRIEVAL_DOCUMENT",
+                })
+                data = r.json()
+                vec = data.get("embedding", {}).get("values", [])
+                if vec:
+                    embeddings[fp] = np.array(vec, dtype=np.float32)
+                else:
+                    print(f"[pipeline] Gemini embed error for {fp}: {data.get('error', {}).get('message', 'unknown')}")
+                    embeddings[fp] = np.random.randn(768).astype(np.float32)
+            except Exception as e:
+                print(f"[pipeline] Embed exception {fp}: {e}")
+                embeddings[fp] = np.random.randn(768).astype(np.float32)
+
+            if (i + 1) % 10 == 0:
+                print(f"[pipeline] Embedded {i+1}/{len(fps)} files")
+                await asyncio.sleep(0.5)  # gentle rate limiting
+
+    print(f"[pipeline] Gemini embedding done: {len(embeddings)} files, dim=768")
+    return embeddings
+
+
+async def embed_tfidf(files: dict) -> dict:
+    """Fast TF-IDF fallback when no Gemini key."""
     from sklearn.feature_extraction.text import TfidfVectorizer
-    print(f"[pipeline] Embedding {len(files)} files with TF-IDF...")
+    print(f"[pipeline] TF-IDF embedding {len(files)} files...")
     fps = list(files.keys())
     texts = [files[fp] for fp in fps]
     vectorizer = TfidfVectorizer(max_features=384, stop_words='english')
     matrix = vectorizer.fit_transform(texts).toarray().astype(np.float32)
-    print(f"[pipeline] Embedding done, shape: {matrix.shape}")
+    print(f"[pipeline] TF-IDF done, shape: {matrix.shape}")
     return {fp: matrix[i] for i, fp in enumerate(fps)}
-
-
-async def embed_vertex(files: dict) -> dict:
-    import vertexai
-    from vertexai.language_models import TextEmbeddingModel, TextEmbeddingInput
-    vertexai.init(project=GCP_PROJECT, location=GCP_LOCATION)
-    model = TextEmbeddingModel.from_pretrained("text-embedding-005")
-    fps = list(files.keys())
-    texts = [files[fp] for fp in fps]
-    embeddings = {}
-    loop = asyncio.get_event_loop()
-    for i in range(0, len(fps), BATCH_SIZE):
-        batch_fps = fps[i:i+BATCH_SIZE]
-        batch_texts = texts[i:i+BATCH_SIZE]
-        inputs = [TextEmbeddingInput(text=t, task_type="RETRIEVAL_DOCUMENT") for t in batch_texts]
-        result = await loop.run_in_executor(None, lambda inp=inputs: model.get_embeddings(inp))
-        for fp, emb in zip(batch_fps, result):
-            embeddings[fp] = np.array(emb.values, dtype=np.float32)
-    return embeddings
 
 
 # ── Step 3: UMAP → 3D ────────────────────────────────────────
@@ -238,7 +183,7 @@ def project_to_3d(embeddings: dict) -> dict:
     fps = list(embeddings.keys())
     matrix = np.stack([embeddings[fp] for fp in fps])
     n = len(fps)
-    print(f"[pipeline] UMAP {matrix.shape}...")
+    print(f"[pipeline] UMAP projecting {matrix.shape} → 3D...")
     reducer = umap.UMAP(
         n_components=UMAP_DIM,
         n_neighbors=min(15, max(2, n-1)),
@@ -254,7 +199,7 @@ def project_to_3d(embeddings: dict) -> dict:
     return {fp: coords[i].tolist() for i, fp in enumerate(fps)}
 
 
-# ── Step 4: Metadata + edges ──────────────────────────────────
+# ── Step 4: Metadata + clustering ────────────────────────────
 
 def compute_metadata(files: dict, coords_3d: dict) -> tuple:
     nodes, file_meta = [], {}
@@ -279,7 +224,8 @@ def compute_metadata(files: dict, coords_3d: dict) -> tuple:
 
 def estimate_heat(fp: str, size: int) -> float:
     hot = ['main','index','app','server','api','router','config','auth',
-           'core','base','utils','helpers','routes','handler','controller']
+           'core','base','utils','helpers','routes','handler','controller',
+           'manager','executor','runner','builder','factory']
     name = fp.lower()
     heat = 0.25
     for p in hot:
@@ -298,6 +244,7 @@ def detect_language(fp: str) -> str:
         '.json':'json','.sh':'shell','.sql':'sql',
         '.html':'html','.css':'css','.scss':'scss',
         '.toml':'yaml','.tf':'other','.kt':'java','.vue':'javascript',
+        '.c':'c','.cpp':'cpp','.h':'c','.cs':'csharp',
     }
     for ext, lang in ext_map.items():
         if fp.endswith(ext):
@@ -315,7 +262,11 @@ def compute_edges(nodes: list, max_dist: float = 0.35, max_per_node: int = 3) ->
         dists[i] = 999
         for j in np.argsort(dists)[:max_per_node]:
             if dists[j] < max_dist:
-                edges.append({"source": node["id"], "target": nodes[j]["id"], "distance": float(dists[j])})
+                edges.append({
+                    "source": node["id"],
+                    "target": nodes[j]["id"],
+                    "distance": float(dists[j])
+                })
     return edges
 
 
@@ -327,15 +278,15 @@ async def run_pipeline(repo_url: str, gitlab_token: Optional[str] = None, max_fi
 
     files, summary = await fetch_repo_files(repo_url, gitlab_token, max_files)
     if not files:
-        raise ValueError("No files found. Check the repo URL.")
+        raise ValueError("No files found. Check the repo URL and make sure it's public.")
 
     embeddings = await embed_files(files)
     coords_3d  = project_to_3d(embeddings)
     nodes, edges, file_meta = compute_metadata(files, coords_3d)
 
     elapsed = (datetime.utcnow() - start).seconds
-    mode = "vertex-ai" if (USE_VERTEX_AI and GCP_PROJECT) else "local"
-    print(f"[pipeline] Done in {elapsed}s — {len(nodes)} nodes")
+    mode = "gemini-embedding" if GEMINI_API_KEY else "tfidf"
+    print(f"[pipeline] Done in {elapsed}s — {len(nodes)} nodes, mode={mode}")
 
     return {
         "session_id": session_id,
@@ -345,5 +296,6 @@ async def run_pipeline(repo_url: str, gitlab_token: Optional[str] = None, max_fi
             "repo_url": repo_url, "file_count": len(nodes),
             "session_id": session_id, "elapsed_seconds": elapsed,
             "mode": mode, "summary": summary,
+            "embedding_model": "text-embedding-004" if GEMINI_API_KEY else "tfidf",
         },
     }
