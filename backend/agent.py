@@ -123,7 +123,12 @@ async def call_groq(message: str, history: list) -> dict:
                 },
             )
             data = r.json()
+            
+        if "choices" not in data:
+            print(f"[agent] Groq response: {data}")
+            return {"text": f"Groq error: {data.get('error', {}).get('message', str(data))}", "actions": [], "model": "error"}
         text = data["choices"][0]["message"]["content"]
+
         actions = await maybe_execute_gitlab_action(message, text)
         return {"text": text, "actions": actions, "model": "groq-llama3"}
     except Exception as e:
