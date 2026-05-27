@@ -14,10 +14,10 @@ import httpx
 import asyncio
 from typing import Optional
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GITLAB_TOKEN   = os.environ.get("GITLAB_TOKEN", "")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GITLAB_TOKEN = os.environ.get("GITLAB_TOKEN", "")
 
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent"
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 SYSTEM_PROMPT = """You are RepoTerrain's codebase intelligence agent.
 
@@ -52,8 +52,8 @@ async def agent_query(
     session  = _sessions.get(session_id, {"history": []})
     history  = session.get("history", [])
 
-    if GEMINI_API_KEY:
-        response = await call_gemini(message, history)
+    if GROQ_API_KEY:
+        response = await call_groq(message, history)
     else:
         response = demo_response(query, selected_file, terrain_data)
 
@@ -102,51 +102,32 @@ def build_message(query: str, ctx: dict) -> str:
     return "\n".join(parts)
 
 
-async def call_gemini(message: str, history: list) -> dict:
-    """Call Gemini 2.0 Flash via free REST API."""
-    contents = []
-
-    # Add history
+async def call_groq(message: str, history: list) -> dict:
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     for h in history[-8:]:
-        contents.append(h)
-
-    # Add current message
-    contents.append({"role": "user", "parts": [{"text": message}]})
-
-    payload = {
-        "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
-        "contents": contents,
-        "generationConfig": {
-            "temperature": 0.3,
-            "maxOutputTokens": 800,
-        },
-    }
+        role = "assistant" if h["role"] == "model" else "user"
+        text = h["parts"][0]["text"]
+        messages.append({"role": role, "content": text})
+    messages.append({"role": "user", "content": message})
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             r = await client.post(
-                f"{GEMINI_URL}?key={GEMINI_API_KEY}",
-                json=payload,
+                GROQ_URL,
+                headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+                json={
+                    "model": "llama3-8b-8192",
+                    "messages": messages,
+                    "temperature": 0.3,
+                    "max_tokens": 800,
+                },
             )
             data = r.json()
-
-        text = (
-            data.get("candidates", [{}])[0]
-                .get("content", {})
-                .get("parts", [{}])[0]
-                .get("text", "")
-        )
-
-        if not text:
-            return demo_response("", None, {})
-
-        # Check for GitLab actions in the response and execute if token available
+        text = data["choices"][0]["message"]["content"]
         actions = await maybe_execute_gitlab_action(message, text)
-
-        return {"text": text, "actions": actions, "model": "gemini-2.0-flash"}
-
+        return {"text": text, "actions": actions, "model": "groq-llama3"}
     except Exception as e:
-        print(f"[agent] Gemini error: {e}")
+        print(f"[agent] Groq error: {e}")
         return {"text": f"Agent error: {str(e)}", "actions": [], "model": "error"}
 
 
