@@ -35,15 +35,8 @@ SKIP_DIRS = {
     'node_modules','__pycache__','.git','.venv','dist','build','vendor','.next',
 }
 
-_local_model = None
-
 def get_local_model():
-    global _local_model
-    if _local_model is None:
-        from sentence_transformers import SentenceTransformer
-        print(f"[pipeline] Loading model: {LOCAL_MODEL}")
-        _local_model = SentenceTransformer(LOCAL_MODEL)
-    return _local_model
+    pass  # no longer used
 
 
 # ── Step 1: Fetch repo tree + file contents via GitLab API ────
@@ -210,15 +203,13 @@ async def embed_files(files: dict) -> dict:
 
 
 async def embed_local(files: dict) -> dict:
-    print(f"[pipeline] Embedding {len(files)} files...")
-    model = get_local_model()
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    print(f"[pipeline] Embedding {len(files)} files with TF-IDF...")
     fps = list(files.keys())
     texts = [files[fp] for fp in fps]
-    loop = asyncio.get_event_loop()
-    matrix = await loop.run_in_executor(
-        None,
-        lambda: model.encode(texts, batch_size=BATCH_SIZE, show_progress_bar=True, convert_to_numpy=True)
-    )
+    vectorizer = TfidfVectorizer(max_features=384, stop_words='english')
+    matrix = vectorizer.fit_transform(texts).toarray().astype(np.float32)
+    print(f"[pipeline] Embedding done, shape: {matrix.shape}")
     return {fp: matrix[i] for i, fp in enumerate(fps)}
 
 
