@@ -116,14 +116,14 @@ async def call_groq(message: str, history: list) -> dict:
                 GROQ_URL,
                 headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
                 json={
-                    "model": "llama3-8b-8192",
+                    "model": "llama-3.1-8b-instant",
                     "messages": messages,
                     "temperature": 0.3,
                     "max_tokens": 800,
                 },
             )
             data = r.json()
-            
+
         if "choices" not in data:
             print(f"[agent] Groq response: {data}")
             return {"text": f"Groq error: {data.get('error', {}).get('message', str(data))}", "actions": [], "model": "error"}
