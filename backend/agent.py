@@ -6,12 +6,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
+import re
 import httpx
 import asyncio
 from typing import Optional
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GROQ_API_KEY   = os.environ.get("GROQ_API_KEY", "")   # fallback
+GROQ_API_KEY   = os.environ.get("GROQ_API_KEY", "")
 GITLAB_TOKEN   = os.environ.get("GITLAB_TOKEN", "")
 
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
@@ -25,10 +26,10 @@ Clusters = functionally related modules. Edges = semantic connections.
 
 RESPONSE FORMAT (always use this):
 🎯 **[Module or File Name]**
-• Why: [one line — specific reason]
-• Key files: [2-3 real filenames from the terrain]
-• Heat: [🔴 Hot / 🟡 Warm / 🔵 Cold]
-• Action: [one concrete next step]
+- Why: [one line — specific reason]
+- Key files: [2-3 real filenames from the terrain]
+- Heat: [🔴 Hot / 🟡 Warm / 🔵 Cold]
+- Action: [one concrete next step]
 
 RULES:
 - Under 120 words
@@ -39,9 +40,9 @@ RULES:
 GITLAB ACTIONS:
 If asked to create an issue, MR, or label:
 ✅ **GitLab Issue Created**
-• Title: [title]
-• Labels: [label1, label2]
-• URL: [will be shown if token available]
+- Title: [title]
+- Labels: [label1, label2]
+- URL: [will be shown if token available]
 
 If asked about commits, pipelines, or MRs — describe what you would fetch and why it matters.
 """
@@ -58,15 +59,15 @@ async def agent_query(
 ) -> dict:
     context = build_context(terrain_data, selected_file, selected_cluster)
     message = build_message(query, context)
+    repo_url = terrain_data.get("meta", {}).get("repo_url", "")
 
     session = _sessions.get(session_id, {"history": []})
     history = session.get("history", [])
 
-    # Try Gemini first, fall back to Groq
     if GEMINI_API_KEY:
-        response = await call_gemini(message, history)
+        response = await call_gemini(message, history, repo_url)
     elif GROQ_API_KEY:
-        response = await call_groq(message, history)
+        response = await call_groq(message, history, repo_url)
     else:
         response = demo_response(query, selected_file, terrain_data)
 
@@ -82,7 +83,6 @@ def build_context(terrain_data: dict, selected_file: Optional[str], selected_clu
     files = terrain_data.get("files", {})
     nodes = terrain_data.get("nodes", [])
 
-    # Build cluster map from nodes
     cluster_map = {}
     for node in nodes:
         lang = node.get("language", "other")
@@ -135,9 +135,9 @@ def build_message(query: str, ctx: dict) -> str:
     return "\n".join(parts)
 
 
-# ── Gemini 2.0 Flash ─────────────────────────────────────────
+# ── Gemini 2.0 Flash ──────────────────────────────────────────
 
-async def call_gemini(message: str, history: list) -> dict:
+async def call_gemini(message: str, history: list, repo_url: str = "") -> dict:
     contents = []
     for h in history[-8:]:
         contents.append(h)
@@ -170,24 +170,23 @@ async def call_gemini(message: str, history: list) -> dict:
         if not text:
             error_msg = data.get("error", {}).get("message", "Unknown Gemini error")
             print(f"[agent] Gemini error: {error_msg}")
-            # Fall back to Groq if available
             if GROQ_API_KEY:
-                return await call_groq(message, history)
+                return await call_groq(message, history, repo_url)
             return {"text": f"⚠️ AI unavailable: {error_msg}", "actions": [], "model": "error"}
 
-        actions = await execute_gitlab_actions(message, text)
+        actions = await execute_gitlab_actions(message, text, repo_url)
         return {"text": text, "actions": actions, "model": "gemini-2.0-flash"}
 
     except Exception as e:
         print(f"[agent] Gemini exception: {e}")
         if GROQ_API_KEY:
-            return await call_groq(message, history)
+            return await call_groq(message, history, repo_url)
         return {"text": f"Agent error: {str(e)}", "actions": [], "model": "error"}
 
 
 # ── Groq fallback ─────────────────────────────────────────────
 
-async def call_groq(message: str, history: list) -> dict:
+async def call_groq(message: str, history: list, repo_url: str = "") -> dict:
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     for h in history[-8:]:
         role = "assistant" if h["role"] == "model" else "user"
@@ -213,7 +212,7 @@ async def call_groq(message: str, history: list) -> dict:
             return {"text": f"⚠️ {data.get('error', {}).get('message', str(data))}", "actions": [], "model": "error"}
 
         text = data["choices"][0]["message"]["content"]
-        actions = await execute_gitlab_actions(message, text)
+        actions = await execute_gitlab_actions(message, text, repo_url)
         return {"text": text, "actions": actions, "model": "groq-llama3"}
 
     except Exception as e:
@@ -223,7 +222,7 @@ async def call_groq(message: str, history: list) -> dict:
 
 # ── GitLab MCP Actions ────────────────────────────────────────
 
-async def execute_gitlab_actions(query: str, response_text: str) -> list:
+async def execute_gitlab_actions(query: str, response_text: str, repo_url: str = "") -> list:
     if not GITLAB_TOKEN:
         return []
 
@@ -231,13 +230,18 @@ async def execute_gitlab_actions(query: str, response_text: str) -> list:
     actions = []
 
     if "create" in q and "issue" in q:
+        match = re.search(r'gitlab\.com/(.+)', repo_url.rstrip('/'))
+        project_path = match.group(1).replace('/', '%2F') if match else None
+
         lines = [l.strip() for l in response_text.split("\n") if l.strip()]
-        title = next((l for l in lines if l and not l.startswith("•") and not l.startswith("-")), "RepoTerrain: Codebase Issue")
-        title = title.strip("🎯#* ").strip()[:80]
+        title = next(
+            (l for l in lines if l and not l.startswith("•") and not l.startswith("-")),
+            "RepoTerrain: Codebase Issue"
+        )
+        title = title.strip("🎯#* ").replace("**", "").strip()[:80]
         if not title:
             title = "RepoTerrain: Auto-generated issue"
 
-        labels = []
         if "cold" in q or "legacy" in q:
             labels = ["tech-debt", "low-priority"]
         elif "hot" in q or "complex" in q:
@@ -245,7 +249,7 @@ async def execute_gitlab_actions(query: str, response_text: str) -> list:
         else:
             labels = ["repoterrain"]
 
-        result = await gitlab_create_issue(title, response_text, labels)
+        result = await gitlab_create_issue(title, response_text, labels, project_path)
         if result:
             actions.append({"tool": "create_issue", "result": result, "title": title})
 
@@ -262,22 +266,27 @@ async def execute_gitlab_actions(query: str, response_text: str) -> list:
     return actions
 
 
-async def gitlab_create_issue(title: str, description: str, labels: list) -> Optional[dict]:
+async def gitlab_create_issue(title: str, description: str, labels: list, project_path: str = None) -> Optional[dict]:
     try:
+        if project_path:
+            url = f"https://gitlab.com/api/v4/projects/{project_path}/issues"
+        else:
+            url = "https://gitlab.com/api/v4/issues"
+
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.post(
-                "https://gitlab.com/api/v4/issues",
+                url,
                 headers={"PRIVATE-TOKEN": GITLAB_TOKEN},
                 json={
                     "title": title,
-                    "description": f"Created by RepoTerrain AI Agent\n\n{description}",
+                    "description": f"🤖 Created by RepoTerrain AI Agent\n\n{description}",
                     "labels": ",".join(labels),
                 },
             )
             data = r.json()
             return {
                 "url": data.get("web_url", ""),
-                "id": data.get("iid", ""),
+                "id":  data.get("iid", ""),
                 "title": data.get("title", title),
             }
     except Exception as e:
