@@ -667,97 +667,97 @@
     #tooltip .t-path { color: var(--accent2); font-size: 10px; margin-bottom: 2px; }
     #tooltip .t-info { color: var(--text3); }
 
-    /* ── FILE CARDS (CSS3D) ── */
+    /* ── FILE CARDS — minimal floating chips ── */
     .node-card {
-      width: 120px;
-      background: rgba(15,20,30,0.92);
-      border: 1px solid rgba(255,255,255,0.07);
-      border-radius: 10px;
+      width: 130px;
+      background: rgba(13,18,28,0.88);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
       overflow: hidden;
       cursor: pointer;
       transition: border-color 0.2s, transform 0.15s;
-      backdrop-filter: blur(12px);
+      backdrop-filter: blur(14px);
       user-select: none;
     }
     .node-card:hover {
-      border-color: rgba(59,130,246,0.45);
-      transform: scale(1.06);
+      border-color: rgba(59,130,246,0.5);
+      transform: scale(1.07);
     }
     .node-card.selected {
-      border-color: rgba(6,182,212,0.7);
+      border-color: rgba(6,182,212,0.65);
     }
 
-    /* colored accent bar — language color */
-    .card-accent {
-      height: 2px;
-      width: 100%;
+    /* left-border accent = language color */
+    .card-inner {
+      border-left: 2px solid transparent;
+      padding: 7px 9px 7px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
     }
 
-    /* icon + filename row */
-    .card-head {
+    /* top row: icon + filename */
+    .card-top-row {
       display: flex;
       align-items: center;
       gap: 5px;
-      padding: 7px 8px 3px;
     }
-    .card-icon {
-      font-size: 11px;
+    .card-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
       flex-shrink: 0;
-      opacity: 0.9;
     }
     .card-fname {
       font-family: var(--mono);
-      font-size: 8.5px;
-      color: rgba(226,232,240,0.9);
+      font-size: 9px;
+      color: rgba(226,232,240,0.88);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 88px;
+      max-width: 100px;
       letter-spacing: 0.1px;
     }
 
-    /* abstract code representation — clean bars */
-    .card-body {
-      padding: 4px 8px 6px;
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
-    .cbar {
-      height: 3px;
-      border-radius: 2px;
-      opacity: 0.5;
-    }
-
-    /* heat indicator strip at bottom */
-    .card-heat {
+    /* heat bar — single thin line */
+    .card-heatrow {
       display: flex;
       align-items: center;
-      gap: 4px;
-      padding: 4px 8px 6px;
-      border-top: 1px solid rgba(255,255,255,0.04);
+      gap: 5px;
     }
-    .card-heat-track {
+    .card-heatbar {
       flex: 1;
       height: 2px;
       border-radius: 1px;
       background: rgba(255,255,255,0.06);
       overflow: hidden;
     }
-    .card-heat-fill { height: 100%; border-radius: 1px; }
-    .card-heat-pct {
+    .card-heatfill {
+      height: 100%;
+      border-radius: 1px;
+    }
+    .card-heatpct {
+      font-family: var(--mono);
+      font-size: 7.5px;
+      color: rgba(100,116,139,0.7);
+      min-width: 20px;
+      text-align: right;
+    }
+
+    /* lang label row */
+    .card-lang {
       font-family: var(--mono);
       font-size: 7px;
-      color: rgba(148,163,184,0.5);
-      min-width: 18px;
-      text-align: right;
+      color: rgba(100,116,139,0.55);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
     }
 
     /* cluster label */
     .cluster-label {
       font-family: var(--mono);
       font-size: 9px;
-      color: rgba(6,182,212,0.55);
+      color: rgba(6,182,212,0.45);
       text-transform: uppercase;
       letter-spacing: 2.5px;
       white-space: nowrap;
@@ -814,8 +814,8 @@
       Try:
       <a onclick="setDemo('gitlab-org/gitlab-runner')">gitlab-runner</a>
       <a onclick="setDemo('inkscape/inkscape')">Inkscape</a>
-      <a onclick="setDemo('gitlab-org/gitlab-foss')">GitLab FOSS</a>
-      <a onclick="setDemo('fdroid/fdroidclient')">F-Droid</a>
+      <a onclick="setDemo('gitlab-org/gitaly')">Gitaly</a>
+      <a onclick="setDemo('gitterHQ/webapp')">Gitter</a>
     </div>
 
     <div class="progress-area" id="progress-area">
@@ -1025,53 +1025,44 @@ function buildCard(node) {
   const cfg = LANG[node.language] || LANG.other;
   const hpct = Math.round(node.heat * 100);
   const hc = heatColor(node.heat);
-  const name = node.name.length > 14 ? node.name.slice(0,12)+'…' : node.name;
-
-  // bar widths — varied but deterministic based on node id hash
-  const seed = node.id.charCodeAt(0) + node.id.charCodeAt(1);
-  const barWidths = [
-    40 + (seed * 7) % 40,
-    25 + (seed * 13) % 35,
-    50 + (seed * 3) % 30,
-    20 + (seed * 17) % 45,
-  ];
+  const name = node.name.length > 15 ? node.name.slice(0,13)+'…' : node.name;
 
   const el = document.createElement('div');
-  el.className = `node-card`;
+  el.className = 'node-card';
   el.dataset.nodeId = node.id;
 
-  // top accent bar
-  const accent = document.createElement('div');
-  accent.className = 'card-accent';
-  accent.style.background = cfg.color;
-  accent.style.opacity = '0.7';
+  const inner = document.createElement('div');
+  inner.className = 'card-inner';
+  inner.style.borderLeftColor = cfg.color;
 
-  // header
-  const head = document.createElement('div');
-  head.className = 'card-head';
-  head.innerHTML = `<span class="card-icon">${cfg.icon}</span><span class="card-fname" title="${node.path}">${name}</span>`;
+  // top row: color dot + filename
+  const topRow = document.createElement('div');
+  topRow.className = 'card-top-row';
+  const dot = document.createElement('div');
+  dot.className = 'card-dot';
+  dot.style.background = cfg.color;
+  const fname = document.createElement('div');
+  fname.className = 'card-fname';
+  fname.title = node.path;
+  fname.textContent = name;
+  topRow.appendChild(dot);
+  topRow.appendChild(fname);
 
-  // body — clean abstract bars
-  const body = document.createElement('div');
-  body.className = 'card-body';
-  const numBars = 2 + Math.floor(node.size * 3);
-  for (let i = 0; i < Math.min(numBars, 4); i++) {
-    const bar = document.createElement('div');
-    bar.className = 'cbar';
-    bar.style.width = barWidths[i % barWidths.length] + '%';
-    bar.style.background = i % 2 === 0 ? cfg.color : 'rgba(255,255,255,0.12)';
-    body.appendChild(bar);
-  }
+  // lang label
+  const lang = document.createElement('div');
+  lang.className = 'card-lang';
+  lang.textContent = node.language;
 
-  // heat strip
-  const heat = document.createElement('div');
-  heat.className = 'card-heat';
-  heat.innerHTML = `<div class="card-heat-track"><div class="card-heat-fill" style="width:${hpct}%;background:${hc}"></div></div><span class="card-heat-pct">${hpct}%</span>`;
+  // heat row
+  const heatRow = document.createElement('div');
+  heatRow.className = 'card-heatrow';
+  heatRow.innerHTML = `<div class="card-heatbar"><div class="card-heatfill" style="width:${hpct}%;background:${hc}"></div></div><span class="card-heatpct">${hpct}%</span>`;
 
-  el.appendChild(accent);
-  el.appendChild(head);
-  el.appendChild(body);
-  el.appendChild(heat);
+  inner.appendChild(topRow);
+  inner.appendChild(lang);
+  inner.appendChild(heatRow);
+  el.appendChild(inner);
+
   el.addEventListener('click', e => { e.stopPropagation(); selectNode(node); });
   return el;
 }
