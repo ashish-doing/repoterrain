@@ -1676,12 +1676,28 @@ function appendAgentMessage(text, actions) {
   const div = document.createElement('div');
   div.className = 'msg agent fade-in';
 
-  let html = `<div class="msg-label">Gemini Agent</div>${escapeHtml(text)}`;
+  let html = `<div class="msg-label">Gemini Agent</div>${escapeHtml(text).replace(/\n/g, '<br>')}`;
+
   if (actions && actions.length > 0) {
     actions.forEach(a => {
-      html += `<div class="action-chip">⚡ ${a.tool} ${a.result ? '· ' + escapeHtml(String(a.result).substring(0, 60)) : ''}</div>`;
+      if (a.tool === 'create_issue' && a.result?.url) {
+        html += `<div class="action-chip">
+          ✅ Issue created — 
+          <a href="${a.result.url}" target="_blank" 
+             style="color:#00e5ff;text-decoration:underline;">
+            #${a.result.id} ${escapeHtml(a.result.title || '')}
+          </a>
+        </div>`;
+      } else if (a.tool === 'list_mrs' && a.result) {
+        html += `<div class="action-chip">📋 ${a.result.length} open MRs fetched</div>`;
+      } else if (a.tool === 'get_pipelines' && a.result) {
+        html += `<div class="action-chip">⚙️ ${a.result.length} pipelines fetched</div>`;
+      } else {
+        html += `<div class="action-chip">⚡ ${escapeHtml(a.tool)}</div>`;
+      }
     });
   }
+
   div.innerHTML = html;
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
