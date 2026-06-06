@@ -127,18 +127,20 @@
       display: flex;
       gap: 6px;
       justify-content: center;
-      flex-wrap: wrap;
-      margin-bottom: 28px;
+      flex-wrap: nowrap;
+      margin-bottom: 24px;
+      overflow: hidden;
     }
     .pill {
       background: rgba(255,255,255,0.04);
       border: 1px solid var(--border2);
       border-radius: 6px;
-      padding: 5px 12px;
-      font-size: 12px;
+      padding: 4px 10px;
+      font-size: 11px;
       font-family: var(--mono);
       color: var(--text2);
-      letter-spacing: 0.2px;
+      white-space: nowrap;
+      letter-spacing: 0.1px;
     }
     .pill.accent { color: var(--accent2); border-color: rgba(6,182,212,0.25); background: rgba(6,182,212,0.06); }
 
@@ -208,19 +210,21 @@
     .steps {
       display: flex;
       justify-content: center;
-      gap: 6px;
-      flex-wrap: wrap;
+      gap: 5px;
+      flex-wrap: nowrap;
       margin-bottom: 14px;
+      overflow: hidden;
     }
     .step {
       font-family: var(--mono);
-      font-size: 11px;
+      font-size: 10px;
       color: var(--text3);
       background: rgba(255,255,255,0.03);
       border: 1px solid var(--border);
-      padding: 4px 10px;
+      padding: 3px 8px;
       border-radius: 5px;
       transition: all 0.3s;
+      white-space: nowrap;
     }
     .step.active { color: var(--accent2); border-color: rgba(6,182,212,0.3); background: rgba(6,182,212,0.06); }
     .step.done { color: #22c55e; border-color: rgba(34,197,94,0.25); }
@@ -665,117 +669,100 @@
 
     /* ── FILE CARDS (CSS3D) ── */
     .node-card {
-      width: 140px;
-      background: rgba(13,17,23,0.95);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 8px;
+      width: 120px;
+      background: rgba(15,20,30,0.92);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 10px;
       overflow: hidden;
       cursor: pointer;
       transition: border-color 0.2s, transform 0.15s;
-      backdrop-filter: blur(10px);
+      backdrop-filter: blur(12px);
       user-select: none;
     }
     .node-card:hover {
-      border-color: rgba(59,130,246,0.5);
-      transform: scale(1.05);
+      border-color: rgba(59,130,246,0.45);
+      transform: scale(1.06);
     }
     .node-card.selected {
-      border-color: var(--accent2);
-      box-shadow: 0 0 20px rgba(6,182,212,0.2);
+      border-color: rgba(6,182,212,0.7);
     }
 
-    .card-top {
+    /* colored accent bar — language color */
+    .card-accent {
       height: 2px;
       width: 100%;
     }
+
+    /* icon + filename row */
     .card-head {
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 8px 10px 4px;
+      gap: 5px;
+      padding: 7px 8px 3px;
     }
-    .card-icon { font-size: 12px; flex-shrink: 0; }
+    .card-icon {
+      font-size: 11px;
+      flex-shrink: 0;
+      opacity: 0.9;
+    }
     .card-fname {
       font-family: var(--mono);
-      font-size: 9px;
-      color: #e2e8f0;
+      font-size: 8.5px;
+      color: rgba(226,232,240,0.9);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 100px;
+      max-width: 88px;
+      letter-spacing: 0.1px;
     }
 
-    .card-lines {
-      padding: 2px 10px 6px;
+    /* abstract code representation — clean bars */
+    .card-body {
+      padding: 4px 8px 6px;
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 3px;
     }
-    .cline {
-      height: 4px;
+    .cbar {
+      height: 3px;
       border-radius: 2px;
-      background: rgba(255,255,255,0.06);
-      position: relative;
-      overflow: hidden;
-    }
-    .cline::after {
-      content: '';
-      position: absolute;
-      left: 0; top: 0; height: 100%;
-      border-radius: 2px;
-      opacity: 0.7;
+      opacity: 0.5;
     }
 
-    .lang-python .cline:nth-child(odd)::after  { background: #3b7dbf; width: 58%; }
-    .lang-python .cline:nth-child(even)::after { background: #ffd43b55; width: 38%; }
-    .lang-javascript .cline:nth-child(odd)::after  { background: #f1e05a; width: 55%; }
-    .lang-javascript .cline:nth-child(even)::after { background: #e8724a66; width: 32%; }
-    .lang-typescript .cline:nth-child(odd)::after  { background: #3178c6; width: 65%; }
-    .lang-typescript .cline:nth-child(even)::after { background: #06b6d466; width: 40%; }
-    .lang-go .cline:nth-child(odd)::after  { background: #00ADD8; width: 50%; }
-    .lang-go .cline:nth-child(even)::after { background: #ffffff22; width: 42%; }
-    .lang-rust .cline:nth-child(odd)::after  { background: #DEA584; width: 55%; }
-    .lang-rust .cline:nth-child(even)::after { background: #d4732a55; width: 30%; }
-    .lang-yaml .cline:nth-child(odd)::after  { background: #cb171e; width: 45%; }
-    .lang-yaml .cline:nth-child(even)::after { background: #6794a766; width: 60%; }
-    .lang-markdown .cline:nth-child(odd)::after  { background: #ffffff55; width: 80%; }
-    .lang-markdown .cline:nth-child(even)::after { background: #ffffff22; width: 55%; }
-    .lang-shell .cline:nth-child(odd)::after  { background: #89e051; width: 52%; }
-    .lang-shell .cline:nth-child(even)::after { background: #4eaa2566; width: 35%; }
-    .lang-other .cline:nth-child(odd)::after  { background: #ffffff33; width: 50%; }
-    .lang-other .cline:nth-child(even)::after { background: #ffffff18; width: 35%; }
-
-    .card-foot {
-      border-top: 1px solid rgba(255,255,255,0.05);
-      padding: 5px 10px;
+    /* heat indicator strip at bottom */
+    .card-heat {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
+      padding: 4px 8px 6px;
+      border-top: 1px solid rgba(255,255,255,0.04);
     }
-    .card-heat-bar {
+    .card-heat-track {
       flex: 1;
       height: 2px;
-      border-radius: 2px;
-      background: rgba(255,255,255,0.07);
+      border-radius: 1px;
+      background: rgba(255,255,255,0.06);
       overflow: hidden;
     }
-    .card-heat-fill { height: 100%; border-radius: 2px; }
+    .card-heat-fill { height: 100%; border-radius: 1px; }
     .card-heat-pct {
       font-family: var(--mono);
-      font-size: 8px;
-      color: rgba(148,163,184,0.6);
+      font-size: 7px;
+      color: rgba(148,163,184,0.5);
+      min-width: 18px;
+      text-align: right;
     }
 
     /* cluster label */
     .cluster-label {
       font-family: var(--mono);
-      font-size: 10px;
-      color: rgba(6,182,212,0.6);
+      font-size: 9px;
+      color: rgba(6,182,212,0.55);
       text-transform: uppercase;
-      letter-spacing: 2px;
+      letter-spacing: 2.5px;
       white-space: nowrap;
       pointer-events: none;
-      text-shadow: 0 0 10px rgba(6,182,212,0.3);
+      font-weight: 500;
     }
 
     /* fade-in animation */
@@ -827,7 +814,7 @@
       Try:
       <a onclick="setDemo('gitlab-org/gitlab-runner')">gitlab-runner</a>
       <a onclick="setDemo('inkscape/inkscape')">Inkscape</a>
-      <a onclick="setDemo('gnome/gnome-shell')">GNOME Shell</a>
+      <a onclick="setDemo('gitlab-org/gitlab-foss')">GitLab FOSS</a>
       <a onclick="setDemo('fdroid/fdroidclient')">F-Droid</a>
     </div>
 
@@ -1038,39 +1025,53 @@ function buildCard(node) {
   const cfg = LANG[node.language] || LANG.other;
   const hpct = Math.round(node.heat * 100);
   const hc = heatColor(node.heat);
-  const name = node.name.length > 16 ? node.name.slice(0,14)+'…' : node.name;
-  const lc = Math.min(3 + Math.floor(node.size * 5), 7);
+  const name = node.name.length > 14 ? node.name.slice(0,12)+'…' : node.name;
+
+  // bar widths — varied but deterministic based on node id hash
+  const seed = node.id.charCodeAt(0) + node.id.charCodeAt(1);
+  const barWidths = [
+    40 + (seed * 7) % 40,
+    25 + (seed * 13) % 35,
+    50 + (seed * 3) % 30,
+    20 + (seed * 17) % 45,
+  ];
 
   const el = document.createElement('div');
-  el.className = `node-card lang-${node.language}`;
+  el.className = `node-card`;
   el.dataset.nodeId = node.id;
 
-  const top = document.createElement('div');
-  top.className = 'card-top';
-  top.style.background = cfg.color;
+  // top accent bar
+  const accent = document.createElement('div');
+  accent.className = 'card-accent';
+  accent.style.background = cfg.color;
+  accent.style.opacity = '0.7';
 
+  // header
   const head = document.createElement('div');
   head.className = 'card-head';
   head.innerHTML = `<span class="card-icon">${cfg.icon}</span><span class="card-fname" title="${node.path}">${name}</span>`;
 
-  const lines = document.createElement('div');
-  lines.className = 'card-lines';
-  const ws = [72,50,88,38,65,55,82];
-  for (let i = 0; i < lc; i++) {
-    const l = document.createElement('div');
-    l.className = 'cline';
-    l.style.width = ws[i % ws.length] + '%';
-    lines.appendChild(l);
+  // body — clean abstract bars
+  const body = document.createElement('div');
+  body.className = 'card-body';
+  const numBars = 2 + Math.floor(node.size * 3);
+  for (let i = 0; i < Math.min(numBars, 4); i++) {
+    const bar = document.createElement('div');
+    bar.className = 'cbar';
+    bar.style.width = barWidths[i % barWidths.length] + '%';
+    bar.style.background = i % 2 === 0 ? cfg.color : 'rgba(255,255,255,0.12)';
+    body.appendChild(bar);
   }
 
-  const foot = document.createElement('div');
-  foot.className = 'card-foot';
-  foot.innerHTML = `<div class="card-heat-bar"><div class="card-heat-fill" style="width:${hpct}%;background:${hc}"></div></div><span class="card-heat-pct">${hpct}%</span>`;
+  // heat strip
+  const heat = document.createElement('div');
+  heat.className = 'card-heat';
+  heat.innerHTML = `<div class="card-heat-track"><div class="card-heat-fill" style="width:${hpct}%;background:${hc}"></div></div><span class="card-heat-pct">${hpct}%</span>`;
 
-  el.appendChild(top);
+  el.appendChild(accent);
   el.appendChild(head);
-  el.appendChild(lines);
-  el.appendChild(foot);
+  el.appendChild(body);
+  el.appendChild(heat);
   el.addEventListener('click', e => { e.stopPropagation(); selectNode(node); });
   return el;
 }
@@ -1091,13 +1092,13 @@ function buildTerrain(nodes, edges) {
     const el = buildCard(node);
     const obj = new THREE.CSS3DObject(el);
     obj.position.set(node.worldX, node.worldY, node.worldZ);
-    obj.scale.set(0.20, 0.20, 0.20);
+    obj.scale.set(0.22, 0.22, 0.22);
     obj.userData = { node };
     scene.add(obj);
     css3dObjects.push(obj);
 
     const proxy = new THREE.Mesh(
-      new THREE.PlaneGeometry(32, 32),
+      new THREE.PlaneGeometry(28, 28),
       new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false })
     );
     proxy.position.set(node.worldX, node.worldY, node.worldZ);
