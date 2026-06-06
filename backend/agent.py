@@ -230,9 +230,9 @@ async def execute_gitlab_actions(query: str, response_text: str, repo_url: str =
     actions = []
 
     if "create" in q and "issue" in q:
-        match = re.search(r'gitlab\.com/(.+)', repo_url.rstrip('/'))
-        project_path = match.group(1).replace('/', '%2F') if match else None
-
+        # Always create on your own repo for demo
+        project_path = "ashish-doing%2Frepoterrain-demo"
+        
         lines = [l.strip() for l in response_text.split("\n") if l.strip()]
         title = next(
             (l for l in lines if l and not l.startswith("•") and not l.startswith("-")),
