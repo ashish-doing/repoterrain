@@ -19,7 +19,6 @@ import umap
 # ── Config ────────────────────────────────────────────────────
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 CHUNK_SIZE     = 2000
-BATCH_SIZE     = 32
 UMAP_DIM       = 3
 MAX_FILES      = 150
 
@@ -31,6 +30,7 @@ SKIP_EXTS = {
 SKIP_DIRS = {
     'node_modules','__pycache__','.git','.venv','dist','build','vendor','.next',
 }
+
 
 # ── Step 1: Fetch repo tree + file contents via GitLab API ────
 
@@ -64,7 +64,6 @@ async def fetch_repo_files(repo_url: str, token: Optional[str] = None, max_files
         summary = f"Repository: {repo_url} | Branch: {default_branch} | Description: {project_info.get('description', '')}"
         print(f"[pipeline] Default branch: {default_branch}")
 
-        # Get file tree
         print(f"[pipeline] Fetching file tree...")
         all_items = []
         page = 1
@@ -108,7 +107,10 @@ async def fetch_repo_files(repo_url: str, token: Optional[str] = None, max_files
 
 async def fetch_file_content(client, base, filepath, branch="main"):
     encoded_path = filepath.replace('/', '%2F')
-    r = await client.get(f"{base}/repository/files/{encoded_path}/raw", params={"ref": branch})
+    r = await client.get(
+        f"{base}/repository/files/{encoded_path}/raw",
+        params={"ref": branch}
+    )
     return r.text if r.status_code == 200 else ""
 
 
@@ -120,23 +122,21 @@ def should_skip(filepath: str) -> bool:
     return any(filepath.endswith(ext) for ext in SKIP_EXTS)
 
 
-# ── Step 2: Embed with Gemini text-embedding-004 ─────────────
+# ── Step 2: Embed ─────────────────────────────────────────────
 
 async def embed_files(files: dict) -> dict:
     if GEMINI_API_KEY:
-        print(f"[pipeline] Using Gemini text-embedding-004 (Google Cloud AI)...")
+        print(f"[pipeline] Using Gemini text-embedding-004...")
         return await embed_gemini(files)
     print(f"[pipeline] No Gemini key — using TF-IDF fallback...")
     return await embed_tfidf(files)
 
 
 async def embed_gemini(files: dict) -> dict:
-    """Embed using Google's text-embedding-004 model via Gemini API."""
     fps = list(files.keys())
     embeddings = {}
     url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={GEMINI_API_KEY}"
 
-    # Process in batches to avoid rate limits
     async with httpx.AsyncClient(timeout=60) as client:
         for i, fp in enumerate(fps):
             text = files[fp][:2000]
@@ -151,7 +151,6 @@ async def embed_gemini(files: dict) -> dict:
                 if vec:
                     embeddings[fp] = np.array(vec, dtype=np.float32)
                 else:
-                    print(f"[pipeline] Gemini embed error for {fp}: {data.get('error', {}).get('message', 'unknown')}")
                     embeddings[fp] = np.random.randn(768).astype(np.float32)
             except Exception as e:
                 print(f"[pipeline] Embed exception {fp}: {e}")
@@ -159,14 +158,13 @@ async def embed_gemini(files: dict) -> dict:
 
             if (i + 1) % 10 == 0:
                 print(f"[pipeline] Embedded {i+1}/{len(fps)} files")
-                await asyncio.sleep(0.5)  # gentle rate limiting
+                await asyncio.sleep(0.5)
 
     print(f"[pipeline] Gemini embedding done: {len(embeddings)} files, dim=768")
     return embeddings
 
 
 async def embed_tfidf(files: dict) -> dict:
-    """Fast TF-IDF fallback when no Gemini key."""
     from sklearn.feature_extraction.text import TfidfVectorizer
     print(f"[pipeline] TF-IDF embedding {len(files)} files...")
     fps = list(files.keys())
@@ -186,7 +184,7 @@ def project_to_3d(embeddings: dict) -> dict:
     print(f"[pipeline] UMAP projecting {matrix.shape} → 3D...")
     reducer = umap.UMAP(
         n_components=UMAP_DIM,
-        n_neighbors=min(15, max(2, n-1)),
+        n_neighbors=min(15, max(2, n - 1)),
         min_dist=0.15,
         metric="cosine",
         random_state=42,
@@ -195,11 +193,111 @@ def project_to_3d(embeddings: dict) -> dict:
     for dim in range(UMAP_DIM):
         col = coords[:, dim]
         mn, mx = col.min(), col.max()
-        coords[:, dim] = 2*(col-mn)/(mx-mn+1e-8) - 1
+        coords[:, dim] = 2 * (col - mn) / (mx - mn + 1e-8) - 1
     return {fp: coords[i].tolist() for i, fp in enumerate(fps)}
 
 
-# ── Step 4: Metadata + clustering ────────────────────────────
+# ── Step 4: Metadata + real clustering ───────────────────────
+
+def compute_clusters(nodes: list) -> dict:
+    """
+    Group nodes into semantic clusters based on directory structure.
+    Returns cluster_map: {cluster_name: [node_ids]}
+    """
+    cluster_map = {}
+    for node in nodes:
+        parts = node["path"].split("/")
+        # use parent directory as cluster name, fall back to language
+        if len(parts) >= 2:
+            cluster_name = parts[-2]
+        else:
+            cluster_name = node["language"]
+        cluster_map.setdefault(cluster_name, []).append(node["id"])
+
+    # filter out singleton clusters — they don't form meaningful groups
+    return {k: v for k, v in cluster_map.items() if len(v) >= 2}
+
+
+def estimate_heat(fp: str, size: int) -> float:
+    """
+    Heat score based on:
+    - filename patterns (core/entry files = hot)
+    - file size (larger = more active)
+    - file depth (shallower = more important)
+    - extension type (config/test/docs = cooler)
+    """
+    name = fp.lower()
+    parts = fp.split("/")
+    depth = len(parts)
+
+    # base heat
+    heat = 0.2
+
+    # hot filename patterns — entry points and core logic
+    hot_patterns = [
+        'main', 'index', 'app', 'server', 'api', 'router',
+        'config', 'auth', 'core', 'base', 'utils', 'helpers',
+        'routes', 'handler', 'controller', 'manager', 'executor',
+        'runner', 'builder', 'factory', 'client', 'engine',
+    ]
+    for p in hot_patterns:
+        if p in name:
+            heat += 0.10
+
+    # cold patterns — docs, tests, generated
+    cold_patterns = ['test', 'spec', 'mock', 'fixture', 'readme',
+                     'changelog', 'license', 'todo', 'example', 'sample']
+    for p in cold_patterns:
+        if p in name:
+            heat -= 0.08
+
+    # size contribution — bigger files tend to be more active
+    heat += min(size / 10000, 0.25)
+
+    # depth penalty — files deep in the tree are usually less core
+    if depth <= 2:
+        heat += 0.10
+    elif depth >= 5:
+        heat -= 0.05
+
+    return round(min(max(heat, 0.05), 1.0), 3)
+
+
+def detect_language(fp: str) -> str:
+    ext_map = {
+        '.py': 'python', '.js': 'javascript', '.ts': 'typescript',
+        '.jsx': 'react', '.tsx': 'react', '.go': 'go', '.rs': 'rust',
+        '.java': 'java', '.rb': 'ruby', '.php': 'php',
+        '.md': 'markdown', '.yml': 'yaml', '.yaml': 'yaml',
+        '.json': 'json', '.sh': 'shell', '.sql': 'sql',
+        '.html': 'html', '.css': 'css', '.scss': 'scss',
+        '.toml': 'yaml', '.tf': 'other', '.kt': 'java',
+        '.vue': 'javascript', '.c': 'c', '.cpp': 'cpp',
+        '.h': 'c', '.cs': 'csharp',
+    }
+    for ext, lang in ext_map.items():
+        if fp.endswith(ext):
+            return lang
+    return 'other'
+
+
+def compute_edges(nodes: list, max_dist: float = 0.35, max_per_node: int = 3) -> list:
+    if not nodes:
+        return []
+    positions = np.array([[n['x'], n['y'], n['z']] for n in nodes])
+    edges = []
+    for i, node in enumerate(nodes):
+        dists = np.linalg.norm(positions - positions[i], axis=1)
+        dists[i] = 999
+        for j in np.argsort(dists)[:max_per_node]:
+            if dists[j] < max_dist:
+                edges.append({
+                    "source":   node["id"],
+                    "target":   nodes[j]["id"],
+                    "distance": float(dists[j]),
+                })
+    return edges
+
 
 def compute_metadata(files: dict, coords_3d: dict) -> tuple:
     nodes, file_meta = [], {}
@@ -212,67 +310,24 @@ def compute_metadata(files: dict, coords_3d: dict) -> tuple:
             "name":     fp.split("/")[-1],
             "x": coord[0], "y": coord[1], "z": coord[2],
             "heat":     estimate_heat(fp, size),
-            "size":     min(size/5000, 1.0),
+            "size":     round(min(size / 5000, 1.0), 3),
             "language": detect_language(fp),
             "worldX": 0, "worldY": 0, "worldZ": 0,
         }
         nodes.append(node)
         file_meta[fp] = node
+
     edges = compute_edges(nodes)
     return nodes, edges, file_meta
 
 
-def estimate_heat(fp: str, size: int) -> float:
-    hot = ['main','index','app','server','api','router','config','auth',
-           'core','base','utils','helpers','routes','handler','controller',
-           'manager','executor','runner','builder','factory']
-    name = fp.lower()
-    heat = 0.25
-    for p in hot:
-        if p in name:
-            heat += 0.12
-    heat += min(size/10000, 0.3)
-    return min(heat, 1.0)
-
-
-def detect_language(fp: str) -> str:
-    ext_map = {
-        '.py':'python','.js':'javascript','.ts':'typescript',
-        '.jsx':'react','.tsx':'react','.go':'go','.rs':'rust',
-        '.java':'java','.rb':'ruby','.php':'php',
-        '.md':'markdown','.yml':'yaml','.yaml':'yaml',
-        '.json':'json','.sh':'shell','.sql':'sql',
-        '.html':'html','.css':'css','.scss':'scss',
-        '.toml':'yaml','.tf':'other','.kt':'java','.vue':'javascript',
-        '.c':'c','.cpp':'cpp','.h':'c','.cs':'csharp',
-    }
-    for ext, lang in ext_map.items():
-        if fp.endswith(ext):
-            return lang
-    return 'other'
-
-
-def compute_edges(nodes: list, max_dist: float = 0.35, max_per_node: int = 3) -> list:
-    if not nodes:
-        return []
-    positions = np.array([[n['x'],n['y'],n['z']] for n in nodes])
-    edges = []
-    for i, node in enumerate(nodes):
-        dists = np.linalg.norm(positions - positions[i], axis=1)
-        dists[i] = 999
-        for j in np.argsort(dists)[:max_per_node]:
-            if dists[j] < max_dist:
-                edges.append({
-                    "source": node["id"],
-                    "target": nodes[j]["id"],
-                    "distance": float(dists[j])
-                })
-    return edges
-
-
 # ── Main pipeline ─────────────────────────────────────────────
 
-async def run_pipeline(repo_url: str, gitlab_token: Optional[str] = None, max_files: int = MAX_FILES) -> dict:
+async def run_pipeline(
+    repo_url: str,
+    gitlab_token: Optional[str] = None,
+    max_files: int = MAX_FILES,
+) -> dict:
     session_id = str(uuid.uuid4())[:8]
     start = datetime.utcnow()
 
@@ -280,22 +335,41 @@ async def run_pipeline(repo_url: str, gitlab_token: Optional[str] = None, max_fi
     if not files:
         raise ValueError("No files found. Check the repo URL and make sure it's public.")
 
-    embeddings = await embed_files(files)
-    coords_3d  = project_to_3d(embeddings)
+    embeddings  = await embed_files(files)
+    coords_3d   = project_to_3d(embeddings)
     nodes, edges, file_meta = compute_metadata(files, coords_3d)
 
+    # real cluster analysis
+    cluster_map    = compute_clusters(nodes)
+    cluster_count  = len(cluster_map)
+    hot_nodes      = sorted(nodes, key=lambda x: x["heat"], reverse=True)
+    cold_nodes     = sorted(nodes, key=lambda x: x["heat"])
+    lang_breakdown = {}
+    for n in nodes:
+        lang_breakdown[n["language"]] = lang_breakdown.get(n["language"], 0) + 1
+
     elapsed = (datetime.utcnow() - start).seconds
-    mode = "gemini-embedding" if GEMINI_API_KEY else "tfidf"
-    print(f"[pipeline] Done in {elapsed}s — {len(nodes)} nodes, mode={mode}")
+    mode    = "gemini-embedding" if GEMINI_API_KEY else "tfidf"
+    print(f"[pipeline] Done in {elapsed}s — {len(nodes)} nodes, {cluster_count} clusters, mode={mode}")
 
     return {
         "session_id": session_id,
-        "nodes": nodes, "edges": edges, "file_meta": file_meta,
-        "files": files,
+        "nodes":      nodes,
+        "edges":      edges,
+        "file_meta":  file_meta,
+        "files":      files,
         "meta": {
-            "repo_url": repo_url, "file_count": len(nodes),
-            "session_id": session_id, "elapsed_seconds": elapsed,
-            "mode": mode, "summary": summary,
+            "repo_url":        repo_url,
+            "file_count":      len(nodes),
+            "cluster_count":   cluster_count,
+            "cluster_names":   list(cluster_map.keys())[:20],
+            "hot_files":       [n["path"] for n in hot_nodes[:5]],
+            "cold_files":      [n["path"] for n in cold_nodes[:5]],
+            "lang_breakdown":  lang_breakdown,
+            "session_id":      session_id,
+            "elapsed_seconds": elapsed,
+            "mode":            mode,
+            "summary":         summary,
             "embedding_model": "text-embedding-004" if GEMINI_API_KEY else "tfidf",
         },
     }

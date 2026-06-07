@@ -1113,7 +1113,7 @@ function buildTerrain(nodes, edges) {
   addParticles(nodes.length);
 
   document.getElementById('stat-files').textContent = nodes.length;
-  document.getElementById('stat-clusters').textContent = Math.ceil(nodes.length / 8);
+  document.getElementById('stat-clusters').textContent = window._terrainMeta?.cluster_count || Math.ceil(nodes.length / 8);
 }
 
 function buildLabels(nodes) {
@@ -1309,11 +1309,15 @@ function setProgress(p, l) {
 function setDemo(p) { document.getElementById('repo-input').value = p; }
 
 function showTerrain(data, repoUrl) {
+  // store meta globally for cluster count + proactive insight
+  window._terrainMeta = data.meta;
+
   document.getElementById('landing').style.display = 'none';
   document.getElementById('hud').style.display = 'block';
   document.getElementById('agent-panel').style.display = 'flex';
   document.getElementById('hud-repo').textContent = repoUrl.replace('https://gitlab.com/', '').substring(0,45);
   buildTerrain(data.nodes, data.edges);
+
   try {
     const wsUrl = `${API_BASE.replace('http','ws')}/ws/${sessionId}`;
     wsConn = new WebSocket(wsUrl);
@@ -1321,6 +1325,17 @@ function showTerrain(data, repoUrl) {
       try { const m = JSON.parse(e.data); if (m.type === 'agent_response') appendAgent(m.text, m.actions||[]); } catch {}
     };
   } catch {}
+
+  // proactive insight — agent fires automatically after terrain loads
+  setTimeout(() => {
+    const meta = data.meta;
+    const hotFile = meta?.hot_files?.[0]?.split('/').pop() || 'core module';
+    const coldFile = meta?.cold_files?.[0]?.split('/').pop() || 'legacy files';
+    const clusters = meta?.cluster_count || '?';
+    const files = meta?.file_count || data.nodes.length;
+    const autoQuery = `Terrain loaded: ${files} files, ${clusters} clusters. In one sentence each: what is the hottest module (${hotFile}), what are the cold zones (${coldFile}), and what should a new developer look at first?`;
+    askAgent(autoQuery);
+  }, 1500);
 }
 
 function initLandingBg() {

@@ -1,24 +1,26 @@
 """
 RepoTerrain — Backend API
+Google Cloud Rapid Agent Hackathon — GitLab Track
 """
 
 import sys
 import asyncio
 
-# ── Windows fix: ProactorEventLoop needed for gitingest subprocesses ──
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 import os
+import time
 from typing import Optional
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from pipeline import run_pipeline
 from agent import agent_query
 
-app = FastAPI(title="RepoTerrain API", version="1.0.0")
+app = FastAPI(title="RepoTerrain API", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -28,8 +30,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve frontend
-from fastapi.responses import HTMLResponse
+terrain_cache: dict = {}
+start_time = time.time()
+
+
+# ── Pages ─────────────────────────────────────────────────────
 
 @app.get("/")
 async def serve_landing():
@@ -37,18 +42,37 @@ async def serve_landing():
     with open(path) as f:
         return HTMLResponse(f.read())
 
+
 @app.get("/app")
 async def serve_frontend():
     path = os.path.join(os.path.dirname(__file__), "index.html")
     with open(path) as f:
         return HTMLResponse(f.read())
 
-terrain_cache: dict = {}
+
+# ── Health ────────────────────────────────────────────────────
+
+@app.get("/health")
+async def health():
+    return {
+        "status": "ok",
+        "version": "2.0.0",
+        "uptime_seconds": round(time.time() - start_time),
+        "active_sessions": len(terrain_cache),
+        "gemini_available": bool(os.environ.get("GEMINI_API_KEY")),
+        "groq_available": bool(os.environ.get("GROQ_API_KEY")),
+        "gitlab_token_set": bool(os.environ.get("GITLAB_TOKEN")),
+        "embedding_model": "gemini-text-embedding-004" if os.environ.get("GEMINI_API_KEY") else "tfidf",
+    }
+
+
+# ── Models ────────────────────────────────────────────────────
 
 class IngestRequest(BaseModel):
     repo_url: str
     gitlab_token: Optional[str] = None
     max_files: int = 150
+
 
 class AgentQueryRequest(BaseModel):
     session_id: str
@@ -56,9 +80,8 @@ class AgentQueryRequest(BaseModel):
     selected_file: Optional[str] = None
     selected_cluster: Optional[list] = None
 
-@app.get("/")
-async def root():
-    return {"status": "RepoTerrain API running", "version": "1.0.0"}
+
+# ── Ingest ────────────────────────────────────────────────────
 
 @app.post("/ingest")
 async def ingest_repo(req: IngestRequest):
@@ -71,20 +94,23 @@ async def ingest_repo(req: IngestRequest):
         terrain_cache[data["session_id"]] = data
         return {
             "session_id": data["session_id"],
-            "nodes": data["nodes"],
-            "edges": data["edges"],
-            "meta": data["meta"],
+            "nodes":      data["nodes"],
+            "edges":      data["edges"],
+            "meta":       data["meta"],
         }
     except Exception as e:
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ── Agent ─────────────────────────────────────────────────────
+
 @app.post("/agent/query")
 async def query_agent(req: AgentQueryRequest):
     terrain = terrain_cache.get(req.session_id)
     if not terrain:
-        raise HTTPException(status_code=404, detail="Session not found.")
+        raise HTTPException(status_code=404, detail="Session not found. Re-ingest the repo.")
     try:
         return await agent_query(
             session_id=req.session_id,
@@ -95,6 +121,9 @@ async def query_agent(req: AgentQueryRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── WebSocket ─────────────────────────────────────────────────
 
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
@@ -107,7 +136,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 if terrain:
                     response = await agent_query(
                         session_id=session_id,
-                        query=data.get("query", "Explain this"),
+                        query=data.get("query", "Explain this codebase"),
                         terrain_data=terrain,
                         selected_file=data.get("file"),
                         selected_cluster=data.get("cluster"),
@@ -116,9 +145,16 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     except WebSocketDisconnect:
         pass
 
+
+# ── Terrain fetch ─────────────────────────────────────────────
+
 @app.get("/terrain/{session_id}")
 async def get_terrain(session_id: str):
     terrain = terrain_cache.get(session_id)
     if not terrain:
         raise HTTPException(status_code=404, detail="Session not found")
-    return {"nodes": terrain["nodes"], "edges": terrain["edges"], "meta": terrain["meta"]}
+    return {
+        "nodes": terrain["nodes"],
+        "edges": terrain["edges"],
+        "meta":  terrain["meta"],
+    }

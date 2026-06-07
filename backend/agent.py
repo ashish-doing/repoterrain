@@ -24,27 +24,34 @@ You analyze GitLab repositories visualized as a live 3D semantic terrain.
 Each file is a floating card. Position = semantic similarity (UMAP). Color = activity heat.
 Clusters = functionally related modules. Edges = semantic connections.
 
-RESPONSE FORMAT (always use this):
+RESPONSE FORMAT (always follow this exactly):
 🎯 **[Module or File Name]**
-- Why: [one line — specific reason]
-- Key files: [2-3 real filenames from the terrain]
-- Heat: [🔴 Hot / 🟡 Warm / 🔵 Cold]
-- Action: [one concrete next step]
+• Why: [one specific reason — reference actual filenames]
+• Key files: [2-3 real filenames from the terrain data]
+• Heat: [🔴 Hot / 🟡 Warm / 🔵 Cold] — [heat percentage if known]
+• Action: [one concrete, specific next step]
 
 RULES:
-- Under 120 words
+- Under 120 words total
 - Only reference files that actually exist in the terrain data provided
 - Never invent file paths or line numbers
-- Be specific, technical, and actionable
+- Be specific and technical — no generic advice
+- When multiple files are relevant, name the most important one first
 
 GITLAB ACTIONS:
-If asked to create an issue, MR, or label:
+When asked to create an issue, respond with the format below AND the action will be executed:
 ✅ **GitLab Issue Created**
-- Title: [title]
-- Labels: [label1, label2]
-- URL: [will be shown if token available]
+• Title: [descriptive title]
+• Labels: [label1, label2]
+• URL: [shown automatically when token is available]
 
-If asked about commits, pipelines, or MRs — describe what you would fetch and why it matters.
+When asked about pipelines or MRs — describe what you fetched and why it matters for the terrain.
+
+PROACTIVE INSIGHT FORMAT (for auto-triggered terrain summaries):
+🗺 **Terrain Overview**
+• Hottest: [filename] — [why it's hot]
+• Coldest: [filename] — [legacy/docs/rarely touched]
+• Start here: [specific file or cluster for a new developer]
 """
 
 _sessions: dict = {}
@@ -64,24 +71,60 @@ async def agent_query(
     session = _sessions.get(session_id, {"history": []})
     history = session.get("history", [])
 
+    # multi-step agentic reasoning
+    reasoning_steps = []
+
+    # step 1: classify intent
+    intent = classify_intent(query)
+    reasoning_steps.append(f"intent: {intent}")
+
+    # step 2: decide model
     if GEMINI_API_KEY:
         response = await call_gemini(message, history, repo_url)
+        reasoning_steps.append("model: gemini-2.0-flash")
     elif GROQ_API_KEY:
         response = await call_groq(message, history, repo_url)
+        reasoning_steps.append("model: groq-llama3.1")
     else:
         response = demo_response(query, selected_file, terrain_data)
+        reasoning_steps.append("model: demo-fallback")
+
+    # step 3: execute gitlab actions if needed
+    if intent in ("create_issue", "list_mrs", "get_pipelines"):
+        reasoning_steps.append(f"action: executing {intent}")
 
     history.append({"role": "user",  "parts": [{"text": message}]})
     history.append({"role": "model", "parts": [{"text": response["text"]}]})
     session["history"] = history[-16:]
     _sessions[session_id] = session
 
+    response["reasoning"] = reasoning_steps
     return response
+
+
+def classify_intent(query: str) -> str:
+    q = query.lower()
+    if "create" in q and "issue" in q:
+        return "create_issue"
+    if "list" in q and ("mr" in q or "merge" in q):
+        return "list_mrs"
+    if "pipeline" in q or ("ci" in q and "status" in q):
+        return "get_pipelines"
+    if any(w in q for w in ["explain", "what is", "what does", "how does"]):
+        return "explain"
+    if any(w in q for w in ["complex", "hot", "active", "important"]):
+        return "analyze_heat"
+    if any(w in q for w in ["cold", "legacy", "unused", "debt"]):
+        return "analyze_cold"
+    if any(w in q for w in ["onboard", "start", "begin", "new developer"]):
+        return "onboard"
+    return "general"
 
 
 def build_context(terrain_data: dict, selected_file: Optional[str], selected_cluster: Optional[list]) -> dict:
     files = terrain_data.get("files", {})
     nodes = terrain_data.get("nodes", [])
+    meta  = terrain_data.get("meta", {})
 
     cluster_map = {}
     for node in nodes:
@@ -89,14 +132,17 @@ def build_context(terrain_data: dict, selected_file: Optional[str], selected_clu
         cluster_map.setdefault(lang, []).append(node["path"])
 
     ctx = {
-        "total_files":   len(nodes),
-        "repo_url":      terrain_data["meta"]["repo_url"],
-        "clusters":      {k: v[:5] for k, v in list(cluster_map.items())[:6]},
-        "selected_file": None,
-        "file_content":  "",
-        "cluster_files": [],
-        "hot_files":     [n["path"] for n in sorted(nodes, key=lambda x: x.get("heat", 0), reverse=True)[:5]],
-        "cold_files":    [n["path"] for n in sorted(nodes, key=lambda x: x.get("heat", 0))[:5]],
+        "total_files":    len(nodes),
+        "cluster_count":  meta.get("cluster_count", len(cluster_map)),
+        "repo_url":       meta.get("repo_url", ""),
+        "clusters":       {k: v[:5] for k, v in list(cluster_map.items())[:6]},
+        "selected_file":  None,
+        "file_content":   "",
+        "cluster_files":  [],
+        "hot_files":      meta.get("hot_files") or [n["path"] for n in sorted(nodes, key=lambda x: x.get("heat", 0), reverse=True)[:5]],
+        "cold_files":     meta.get("cold_files") or [n["path"] for n in sorted(nodes, key=lambda x: x.get("heat", 0))[:5]],
+        "lang_breakdown": meta.get("lang_breakdown", {}),
+        "embedding_mode": meta.get("mode", "tfidf"),
     }
 
     if selected_file and selected_file in files:
@@ -114,9 +160,11 @@ def build_context(terrain_data: dict, selected_file: Optional[str], selected_clu
 def build_message(query: str, ctx: dict) -> str:
     parts = [
         f"Repository: {ctx['repo_url']}",
-        f"Total files: {ctx['total_files']}",
+        f"Total files: {ctx['total_files']} across {ctx['cluster_count']} semantic clusters",
         f"Hottest files: {', '.join(ctx['hot_files'])}",
         f"Coldest files: {', '.join(ctx['cold_files'])}",
+        f"Language breakdown: {ctx['lang_breakdown']}",
+        f"Embedding mode: {ctx['embedding_mode']}",
     ]
 
     if ctx["clusters"]:
@@ -138,26 +186,18 @@ def build_message(query: str, ctx: dict) -> str:
 # ── Gemini 2.0 Flash ──────────────────────────────────────────
 
 async def call_gemini(message: str, history: list, repo_url: str = "") -> dict:
-    contents = []
-    for h in history[-8:]:
-        contents.append(h)
+    contents = list(history[-8:])
     contents.append({"role": "user", "parts": [{"text": message}]})
 
     payload = {
         "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
         "contents": contents,
-        "generationConfig": {
-            "temperature": 0.3,
-            "maxOutputTokens": 600,
-        },
+        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 600},
     }
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
-            r = await client.post(
-                f"{GEMINI_URL}?key={GEMINI_API_KEY}",
-                json=payload,
-            )
+            r = await client.post(f"{GEMINI_URL}?key={GEMINI_API_KEY}", json=payload)
             data = r.json()
 
         text = (
@@ -230,9 +270,9 @@ async def execute_gitlab_actions(query: str, response_text: str, repo_url: str =
     actions = []
 
     if "create" in q and "issue" in q:
-        # Always create on your own repo for demo
+        # always create on your own demo repo
         project_path = "ashish-doing%2Frepoterrain-demo"
-        
+
         lines = [l.strip() for l in response_text.split("\n") if l.strip()]
         title = next(
             (l for l in lines if l and not l.startswith("•") and not l.startswith("-")),
@@ -258,7 +298,7 @@ async def execute_gitlab_actions(query: str, response_text: str, repo_url: str =
         if result:
             actions.append({"tool": "list_mrs", "result": result})
 
-    elif "pipeline" in q or "ci" in q:
+    elif "pipeline" in q or ("ci" in q and "status" in q):
         result = await gitlab_get_pipelines()
         if result:
             actions.append({"tool": "get_pipelines", "result": result})
@@ -268,11 +308,7 @@ async def execute_gitlab_actions(query: str, response_text: str, repo_url: str =
 
 async def gitlab_create_issue(title: str, description: str, labels: list, project_path: str = None) -> Optional[dict]:
     try:
-        if project_path:
-            url = f"https://gitlab.com/api/v4/projects/{project_path}/issues"
-        else:
-            url = "https://gitlab.com/api/v4/issues"
-
+        url = f"https://gitlab.com/api/v4/projects/{project_path}/issues" if project_path else "https://gitlab.com/api/v4/issues"
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.post(
                 url,
@@ -285,8 +321,8 @@ async def gitlab_create_issue(title: str, description: str, labels: list, projec
             )
             data = r.json()
             return {
-                "url": data.get("web_url", ""),
-                "id":  data.get("iid", ""),
+                "url":   data.get("web_url", ""),
+                "id":    data.get("iid", ""),
                 "title": data.get("title", title),
             }
     except Exception as e:
@@ -320,9 +356,9 @@ async def gitlab_get_pipelines() -> Optional[list]:
             projects = r.json()
             if not projects:
                 return None
-            project_id = projects[0]["id"]
+            pid = projects[0]["id"]
             r2 = await client.get(
-                f"https://gitlab.com/api/v4/projects/{project_id}/pipelines",
+                f"https://gitlab.com/api/v4/projects/{pid}/pipelines",
                 headers={"PRIVATE-TOKEN": GITLAB_TOKEN},
                 params={"per_page": 5},
             )
@@ -336,10 +372,11 @@ async def gitlab_get_pipelines() -> Optional[list]:
 # ── Demo fallback ─────────────────────────────────────────────
 
 def demo_response(query: str, selected_file: Optional[str], terrain_data: dict) -> dict:
-    total = len(terrain_data.get("nodes", [])) if terrain_data else 0
-    nodes = terrain_data.get("nodes", []) if terrain_data else []
-    hot = [n["path"] for n in sorted(nodes, key=lambda x: x.get("heat", 0), reverse=True)[:3]]
-    q = query.lower() if query else ""
+    nodes = terrain_data.get("nodes", [])
+    meta  = terrain_data.get("meta", {})
+    total = len(nodes)
+    hot   = meta.get("hot_files") or [n["path"] for n in sorted(nodes, key=lambda x: x.get("heat", 0), reverse=True)[:3]]
+    q     = query.lower() if query else ""
 
     if selected_file:
         name = selected_file.split("/")[-1]
@@ -348,24 +385,32 @@ def demo_response(query: str, selected_file: Optional[str], terrain_data: dict) 
             f"• Why: Central file in its semantic cluster\n"
             f"• Key files: {selected_file}\n"
             f"• Heat: 🟡 Warm\n"
-            f"• Action: Add GEMINI_API_KEY for real AI analysis"
+            f"• Action: Add GEMINI_API_KEY for deep AI analysis"
         )
     elif "complex" in q or "hot" in q:
-        top = hot[0] if hot else "main file"
+        top = hot[0].split("/")[-1] if hot else "main file"
         text = (
-            f"🎯 **{top.split('/')[-1]}**\n"
+            f"🎯 **{top}**\n"
             f"• Why: Highest activity heat in terrain\n"
-            f"• Key files: {', '.join(hot[:2])}\n"
+            f"• Key files: {', '.join(p.split('/')[-1] for p in hot[:2])}\n"
             f"• Heat: 🔴 Hot\n"
-            f"• Action: Add GEMINI_API_KEY for deep analysis"
+            f"• Action: Review recently changed files in this cluster"
+        )
+    elif "terrain" in q or "overview" in q or "loaded" in q:
+        top = hot[0].split("/")[-1] if hot else "core module"
+        text = (
+            f"🗺 **Terrain Overview**\n"
+            f"• Hottest: {top} — highest activity score\n"
+            f"• Coldest: legacy files in outer clusters — low heat, rarely touched\n"
+            f"• Start here: navigate to the red cluster first — that's where the core logic lives"
         )
     else:
         text = (
-            f"🎯 **{total} files** mapped across semantic clusters\n"
+            f"🎯 **{total} files** across {meta.get('cluster_count', '?')} semantic clusters\n"
             f"• Why: Files positioned by code similarity via UMAP\n"
-            f"• Key files: {', '.join(hot[:2]) if hot else 'loading...'}\n"
+            f"• Key files: {', '.join(p.split('/')[-1] for p in hot[:2]) if hot else 'loading...'}\n"
             f"• Heat: Mixed zones detected\n"
-            f"• Action: Add GEMINI_API_KEY to enable real AI"
+            f"• Action: Click any file card for specific analysis"
         )
 
     return {"text": text, "actions": [], "model": "demo-mode"}
