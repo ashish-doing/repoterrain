@@ -31,6 +31,12 @@ app.add_middleware(
 # Serve frontend
 from fastapi.responses import HTMLResponse
 
+@app.get("/")
+async def serve_landing():
+    path = os.path.join(os.path.dirname(__file__), "landing.html")
+    with open(path) as f:
+        return HTMLResponse(f.read())
+
 @app.get("/app")
 async def serve_frontend():
     path = os.path.join(os.path.dirname(__file__), "index.html")
