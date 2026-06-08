@@ -5,52 +5,68 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>RepoTerrain — Codebase Intelligence</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#060810;
-  --s1:#0a0f1a;
-  --s2:#0f1520;
-  --border:rgba(255,255,255,0.07);
-  --border2:rgba(255,255,255,0.13);
+  --bg:#04060f;
+  --s1:#080c18;
+  --s2:#0c1220;
+  --border:rgba(255,255,255,0.06);
+  --border2:rgba(255,255,255,0.12);
   --blue:#3b82f6;
-  --cyan:#06b6d4;
-  --orange:#f97316;
-  --red:#ef4444;
-  --green:#22c55e;
-  --text:#f1f5f9;
-  --text2:#94a3b8;
-  --text3:#475569;
-  --mono:'JetBrains Mono',monospace;
-  --ui:'Space Grotesk',system-ui,sans-serif;
+  --cyan:#22d3ee;
+  --orange:#fb923c;
+  --red:#f87171;
+  --green:#4ade80;
+  --purple:#a78bfa;
+  --text:#f0f4ff;
+  --text2:#8b9dbf;
+  --text3:#3d4f6b;
+  --mono:'DM Mono',monospace;
+  --ui:'Syne',system-ui,sans-serif;
+  --body:'DM Sans',system-ui,sans-serif;
+  --glow-blue:rgba(59,130,246,0.15);
+  --glow-cyan:rgba(34,211,238,0.12);
 }
 html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--text);font-family:var(--ui);overflow-x:hidden;line-height:1.6}
+body{background:var(--bg);color:var(--text);font-family:var(--body);overflow-x:hidden;line-height:1.6}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 
 /* ── NAV ── */
 nav{
   position:fixed;top:0;left:0;right:0;z-index:100;
   display:flex;align-items:center;justify-content:space-between;
-  padding:0 40px;height:60px;
-  background:rgba(6,8,16,0.85);
+  padding:0 60px;height:64px;
+  background:rgba(4,6,15,0.8);
   border-bottom:1px solid var(--border);
-  backdrop-filter:blur(12px);
+  backdrop-filter:blur(16px);
 }
 .nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
-.nav-logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--blue),var(--cyan));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
-.nav-logo-name{font-family:var(--mono);font-size:16px;font-weight:600;color:var(--text)}
+.nav-logo-icon{
+  width:34px;height:34px;
+  background:linear-gradient(135deg,var(--blue),var(--cyan));
+  border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;
+  box-shadow:0 0 20px rgba(34,211,238,0.3);
+}
+.nav-logo-name{font-family:var(--ui);font-size:17px;font-weight:700;color:var(--text);letter-spacing:-0.3px}
 .nav-logo-name em{color:var(--cyan);font-style:normal}
-.nav-links{display:flex;align-items:center;gap:28px}
-.nav-links a{font-size:13px;color:var(--text2);text-decoration:none;transition:color 0.15s}
+.nav-links{display:flex;align-items:center;gap:32px}
+.nav-links a{font-size:13px;font-family:var(--ui);font-weight:500;color:var(--text2);text-decoration:none;transition:color 0.2s;letter-spacing:0.2px}
 .nav-links a:hover{color:var(--text)}
 .nav-cta{
-  background:var(--blue);color:#fff;
-  font-size:13px;font-weight:600;
-  padding:8px 18px;border-radius:8px;
-  text-decoration:none;transition:background 0.15s;
+  background:linear-gradient(135deg,var(--blue),#6366f1);
+  color:#fff;font-family:var(--ui);font-size:13px;font-weight:600;
+  padding:9px 22px;border-radius:8px;text-decoration:none;
+  transition:opacity 0.15s;letter-spacing:0.2px;
+  box-shadow:0 4px 20px rgba(59,130,246,0.3);
 }
-.nav-cta:hover{background:#2563eb;color:#fff}
+.nav-cta:hover{opacity:0.88}
+@media(max-width:768px){.nav-links{display:none}.nav{padding:0 24px}}
 
 /* ── HERO ── */
 .hero{
@@ -58,173 +74,264 @@ nav{
   display:flex;flex-direction:column;
   align-items:center;justify-content:center;
   text-align:center;
-  padding:100px 24px 60px;
+  padding:120px 40px 80px;
   position:relative;overflow:hidden;
 }
 .hero-bg{position:absolute;inset:0;z-index:0}
-.hero-inner{position:relative;z-index:1;max-width:740px}
+/* radial glows */
+.hero::before{
+  content:'';position:absolute;
+  top:20%;left:50%;transform:translateX(-50%);
+  width:700px;height:400px;border-radius:50%;
+  background:radial-gradient(ellipse,rgba(34,211,238,0.06) 0%,transparent 70%);
+  pointer-events:none;z-index:0;
+}
+.hero::after{
+  content:'';position:absolute;
+  top:40%;left:30%;
+  width:400px;height:300px;border-radius:50%;
+  background:radial-gradient(ellipse,rgba(59,130,246,0.07) 0%,transparent 70%);
+  pointer-events:none;z-index:0;
+}
+.hero-inner{position:relative;z-index:1;max-width:900px;width:100%}
 
 .hero-badge{
-  display:inline-flex;align-items:center;gap:6px;
-  background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25);
-  border-radius:20px;padding:5px 14px;
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(34,211,238,0.07);border:1px solid rgba(34,211,238,0.2);
+  border-radius:100px;padding:6px 18px;
   font-family:var(--mono);font-size:11px;color:var(--cyan);
-  margin-bottom:28px;letter-spacing:0.3px;
+  margin-bottom:36px;letter-spacing:0.4px;
 }
-.hero-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.hero-badge-dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.8)}}
 
 .hero h1{
-  font-size:clamp(36px,6vw,68px);
-  font-weight:700;line-height:1.1;
-  letter-spacing:-2px;
-  margin-bottom:20px;
+  font-family:var(--ui);
+  font-size:clamp(52px,8vw,96px);
+  font-weight:800;line-height:1.0;
+  letter-spacing:-3px;
+  margin-bottom:6px;color:var(--text);
 }
-.hero h1 .line2{
-  background:linear-gradient(135deg,var(--cyan),var(--blue));
+.hero h1 .gradient{
+  background:linear-gradient(135deg,var(--cyan) 0%,var(--blue) 50%,var(--purple) 100%);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  display:block;
 }
 .hero-sub{
-  font-size:17px;color:var(--text2);line-height:1.7;
-  max-width:560px;margin:0 auto 36px;font-weight:400;
+  font-size:18px;color:var(--text2);line-height:1.75;
+  max-width:620px;margin:28px auto 44px;font-weight:300;
+  font-family:var(--body);
 }
+.hero-sub strong{color:var(--text);font-weight:500}
 
-.hero-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:48px}
+.hero-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-bottom:64px}
 .btn-primary{
-  background:var(--blue);color:#fff;font-weight:600;font-size:15px;
-  padding:13px 28px;border-radius:10px;text-decoration:none;
-  display:flex;align-items:center;gap:8px;transition:background 0.15s;
+  background:linear-gradient(135deg,var(--blue),#6366f1);
+  color:#fff;font-family:var(--ui);font-weight:600;font-size:15px;
+  padding:15px 32px;border-radius:10px;text-decoration:none;
+  display:flex;align-items:center;gap:8px;
+  transition:transform 0.15s,box-shadow 0.15s;
+  box-shadow:0 4px 24px rgba(59,130,246,0.35);
+  letter-spacing:0.2px;
 }
-.btn-primary:hover{background:#2563eb}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(59,130,246,0.45)}
 .btn-secondary{
-  background:rgba(255,255,255,0.05);color:var(--text);font-weight:500;font-size:15px;
-  padding:13px 28px;border-radius:10px;text-decoration:none;
-  border:1px solid var(--border2);display:flex;align-items:center;gap:8px;
-  transition:background 0.15s;
+  background:rgba(255,255,255,0.04);color:var(--text);
+  font-family:var(--ui);font-weight:500;font-size:15px;
+  padding:15px 32px;border-radius:10px;text-decoration:none;
+  border:1px solid var(--border2);
+  display:flex;align-items:center;gap:8px;
+  transition:background 0.15s,border-color 0.15s;
 }
-.btn-secondary:hover{background:rgba(255,255,255,0.09)}
+.btn-secondary:hover{background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.2)}
 
-.hero-stats{display:flex;gap:32px;justify-content:center;flex-wrap:wrap}
-.hero-stat{text-align:center}
-.hero-stat-num{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--text)}
+/* hero stats */
+.hero-stats{
+  display:flex;gap:0;justify-content:center;
+  background:var(--s1);border:1px solid var(--border);border-radius:16px;
+  overflow:hidden;max-width:600px;margin:0 auto;
+}
+.hero-stat{
+  flex:1;padding:20px 24px;text-align:center;
+  border-right:1px solid var(--border);
+  transition:background 0.2s;
+}
+.hero-stat:last-child{border-right:none}
+.hero-stat:hover{background:rgba(34,211,238,0.04)}
+.hero-stat-num{font-family:var(--mono);font-size:26px;font-weight:500;color:var(--text);line-height:1}
 .hero-stat-num span{color:var(--cyan)}
-.hero-stat-label{font-size:12px;color:var(--text3);margin-top:2px}
+.hero-stat-label{font-size:11px;color:var(--text3);margin-top:5px;letter-spacing:0.5px;text-transform:uppercase}
 
-/* ── SECTION WRAPPER ── */
-section{padding:80px 24px}
-.section-inner{max-width:1100px;margin:0 auto}
+/* ── SHARED SECTION STYLES ── */
+section{padding:96px 40px}
+.section-inner{max-width:1160px;margin:0 auto}
 .section-label{
   font-family:var(--mono);font-size:11px;color:var(--cyan);
-  text-transform:uppercase;letter-spacing:2px;margin-bottom:12px;
+  text-transform:uppercase;letter-spacing:3px;margin-bottom:14px;
+  display:flex;align-items:center;gap:10px;
 }
+.section-label::before{content:'';width:24px;height:1px;background:var(--cyan)}
 .section-title{
-  font-size:clamp(26px,4vw,40px);font-weight:700;
-  letter-spacing:-0.8px;line-height:1.2;margin-bottom:16px;
+  font-family:var(--ui);
+  font-size:clamp(32px,4vw,48px);font-weight:700;
+  letter-spacing:-1px;line-height:1.15;margin-bottom:16px;
 }
-.section-sub{font-size:16px;color:var(--text2);max-width:540px;line-height:1.7}
+.section-sub{font-size:16px;color:var(--text2);max-width:540px;line-height:1.75}
+.divider{height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent)}
 
-/* ── PROBLEM/SOLUTION ── */
-.ps-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:48px}
-@media(max-width:680px){.ps-grid{grid-template-columns:1fr}}
+/* fade animation */
+.fade-up{opacity:0;transform:translateY(28px);transition:opacity 0.65s ease,transform 0.65s ease}
+.fade-up.visible{opacity:1;transform:none}
+
+/* ── PROBLEM / SOLUTION ── */
+#problem .section-inner{display:flex;flex-direction:column;gap:48px}
+.ps-header{}
+.ps-visual-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:20px;
+}
+@media(max-width:768px){.ps-visual-grid{grid-template-columns:1fr}}
+
 .ps-card{
-  background:var(--s1);border:1px solid var(--border);border-radius:14px;
-  padding:28px;
+  border-radius:16px;padding:32px;
+  position:relative;overflow:hidden;
 }
-.ps-card.before{border-color:rgba(239,68,68,0.2);background:rgba(239,68,68,0.03)}
-.ps-card.after{border-color:rgba(34,197,94,0.2);background:rgba(34,197,94,0.03)}
+.ps-card.before{
+  background:rgba(248,113,113,0.04);
+  border:1px solid rgba(248,113,113,0.15);
+}
+.ps-card.after{
+  background:rgba(74,222,128,0.03);
+  border:1px solid rgba(74,222,128,0.15);
+}
+.ps-card-header{
+  display:flex;align-items:center;gap:12px;margin-bottom:24px;
+}
+.ps-card-icon{
+  width:36px;height:36px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;font-size:17px;
+}
+.before .ps-card-icon{background:rgba(248,113,113,0.12)}
+.after .ps-card-icon{background:rgba(74,222,128,0.12)}
 .ps-card-label{
-  display:inline-flex;align-items:center;gap:6px;
-  font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:1px;
-  padding:3px 10px;border-radius:4px;margin-bottom:16px;font-weight:500;
+  font-family:var(--mono);font-size:10px;text-transform:uppercase;
+  letter-spacing:1.5px;font-weight:500;padding:3px 10px;border-radius:4px;
 }
-.ps-card.before .ps-card-label{color:var(--red);background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2)}
-.ps-card.after .ps-card-label{color:var(--green);background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2)}
-.ps-card h3{font-size:18px;font-weight:600;margin-bottom:12px}
+.before .ps-card-label{color:var(--red);background:rgba(248,113,113,0.1)}
+.after .ps-card-label{color:var(--green);background:rgba(74,222,128,0.1)}
+.ps-card h3{font-family:var(--ui);font-size:20px;font-weight:700;margin-bottom:20px;letter-spacing:-0.3px}
+
 .ps-item{
   display:flex;align-items:flex-start;gap:10px;
-  font-size:14px;color:var(--text2);margin-bottom:10px;line-height:1.5;
+  font-size:14px;color:var(--text2);margin-bottom:12px;line-height:1.6;
+  font-family:var(--body);
 }
-.ps-item::before{content:'';width:5px;height:5px;border-radius:50%;flex-shrink:0;margin-top:7px}
-.ps-card.before .ps-item::before{background:var(--red)}
-.ps-card.after .ps-item::before{background:var(--green)}
+.ps-dot{
+  width:20px;height:20px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;margin-top:1px;font-size:10px;
+}
+.before .ps-dot{background:rgba(248,113,113,0.12);color:var(--red)}
+.after .ps-dot{background:rgba(74,222,128,0.12);color:var(--green)}
+
+/* visual mockup inside ps-card */
+.ps-mockup{
+  margin-top:24px;border-radius:10px;overflow:hidden;
+  border:1px solid rgba(255,255,255,0.05);
+  background:rgba(0,0,0,0.3);padding:16px;
+}
+.ps-mockup-title{font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:10px;letter-spacing:1px;text-transform:uppercase}
+/* flat file tree mockup */
+.filetree{font-family:var(--mono);font-size:11px;color:var(--text3);line-height:2}
+.filetree .dir{color:var(--text2)}
+.filetree .file{color:var(--text3);padding-left:16px}
+/* 3d terrain mockup */
+.terrain-preview{
+  display:flex;flex-wrap:wrap;gap:5px;
+}
+.t-cluster{
+  border-radius:6px;padding:6px 10px;
+  font-family:var(--mono);font-size:9px;font-weight:500;letter-spacing:0.5px;
+  border:1px solid;display:flex;align-items:center;gap:4px;
+}
+.t-hot{background:rgba(251,146,60,0.1);border-color:rgba(251,146,60,0.25);color:var(--orange)}
+.t-warm{background:rgba(59,130,246,0.1);border-color:rgba(59,130,246,0.25);color:var(--blue)}
+.t-cold{background:rgba(34,211,238,0.06);border-color:rgba(34,211,238,0.15);color:var(--cyan)}
+.t-dot{width:6px;height:6px;border-radius:50%}
+.t-hot .t-dot{background:var(--orange)}
+.t-warm .t-dot{background:var(--blue)}
+.t-cold .t-dot{background:var(--text3)}
 
 /* ── HOW IT WORKS ── */
-.steps-grid{
-  display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-  gap:16px;margin-top:48px;
+.steps-row{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:0;
+  margin-top:52px;
+  border:1px solid var(--border);
+  border-radius:16px;overflow:hidden;
 }
+@media(max-width:900px){.steps-row{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:600px){.steps-row{grid-template-columns:1fr 1fr}}
 .step-card{
-  background:var(--s1);border:1px solid var(--border);border-radius:12px;
-  padding:24px;position:relative;overflow:hidden;
+  padding:28px 22px;
+  border-right:1px solid var(--border);
+  position:relative;transition:background 0.2s;
 }
-.step-card::before{
-  content:attr(data-step);
-  position:absolute;top:-10px;right:16px;
-  font-family:var(--mono);font-size:72px;font-weight:700;
-  color:rgba(255,255,255,0.03);line-height:1;
+.step-card:last-child{border-right:none}
+.step-card:hover{background:rgba(34,211,238,0.03)}
+
+/* connector arrow between steps */
+.step-card:not(:last-child)::after{
+  content:'→';
+  position:absolute;top:28px;right:-10px;
+  font-size:12px;color:var(--text3);z-index:2;
+  background:var(--bg);padding:2px 3px;
 }
-.step-num{
-  width:32px;height:32px;border-radius:8px;
+.step-num-badge{
+  width:28px;height:28px;border-radius:7px;
   background:linear-gradient(135deg,var(--blue),var(--cyan));
   display:flex;align-items:center;justify-content:center;
-  font-family:var(--mono);font-size:13px;font-weight:600;
-  margin-bottom:14px;
+  font-family:var(--mono);font-size:11px;font-weight:500;
+  margin-bottom:14px;color:#fff;
 }
-.step-card h3{font-size:15px;font-weight:600;margin-bottom:8px}
-.step-card p{font-size:13px;color:var(--text2);line-height:1.6}
+.step-card h3{font-family:var(--ui);font-size:14px;font-weight:700;margin-bottom:8px;letter-spacing:-0.2px}
+.step-card p{font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:12px}
 .step-tag{
-  display:inline-block;margin-top:12px;
-  font-family:var(--mono);font-size:10px;
-  color:var(--cyan);background:rgba(6,182,212,0.08);
-  border:1px solid rgba(6,182,212,0.18);
-  border-radius:4px;padding:2px 8px;
-}
-
-/* ── ARCHITECTURE ── */
-.arch-wrap{
-  background:var(--s1);border:1px solid var(--border);border-radius:16px;
-  padding:32px;margin-top:48px;overflow-x:auto;
-}
-.arch-diagram{
-  font-family:var(--mono);font-size:12px;color:var(--text2);
-  white-space:pre;line-height:1.8;min-width:600px;
-}
-.arch-diagram .hl{color:var(--cyan)}
-.arch-diagram .hl2{color:var(--blue)}
-.arch-diagram .hl3{color:var(--orange)}
-.arch-diagram .hl4{color:var(--green)}
-
-/* ── TECH STACK GRID ── */
-.tech-grid{
-  display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
-  gap:12px;margin-top:48px;
-}
-.tech-card{
-  background:var(--s1);border:1px solid var(--border);border-radius:10px;
-  padding:16px 18px;display:flex;align-items:flex-start;gap:12px;
-}
-.tech-icon{font-size:22px;flex-shrink:0;margin-top:1px}
-.tech-info{}
-.tech-name{font-size:13px;font-weight:600;margin-bottom:3px}
-.tech-desc{font-size:12px;color:var(--text3);line-height:1.4}
-.tech-badge{
-  display:inline-block;margin-top:6px;
+  display:inline-block;
   font-family:var(--mono);font-size:9px;
-  color:var(--cyan);background:rgba(6,182,212,0.07);
-  border:1px solid rgba(6,182,212,0.15);
-  border-radius:3px;padding:1px 6px;
+  color:var(--cyan);background:rgba(34,211,238,0.07);
+  border:1px solid rgba(34,211,238,0.15);
+  border-radius:4px;padding:2px 8px;letter-spacing:0.3px;
 }
 
-/* ── GUIDE / TUTORIAL ── */
-.guide-wrap{margin-top:48px}
-.guide-tabs{display:flex;gap:8px;margin-bottom:28px;flex-wrap:wrap}
-.gtab{
-  background:var(--s1);border:1px solid var(--border);border-radius:8px;
-  padding:8px 16px;font-size:13px;color:var(--text2);cursor:pointer;
-  transition:all 0.15s;display:flex;align-items:center;gap:6px;
+/* ── GUIDE ── */
+#guide .section-inner{}
+.guide-layout{
+  display:grid;grid-template-columns:200px 1fr;gap:24px;margin-top:48px;
 }
-.gtab:hover{border-color:var(--border2);color:var(--text)}
-.gtab.active{border-color:var(--cyan);color:var(--cyan);background:rgba(6,182,212,0.07)}
+@media(max-width:768px){.guide-layout{grid-template-columns:1fr}}
+.guide-sidebar{
+  display:flex;flex-direction:column;gap:4px;
+}
+@media(max-width:768px){.guide-sidebar{flex-direction:row;flex-wrap:wrap}}
+.gtab{
+  background:transparent;border:1px solid transparent;border-radius:10px;
+  padding:11px 16px;font-family:var(--ui);font-size:13px;font-weight:500;
+  color:var(--text2);cursor:pointer;transition:all 0.15s;
+  display:flex;align-items:center;gap:8px;text-align:left;
+}
+.gtab:hover{background:rgba(255,255,255,0.04);color:var(--text);border-color:var(--border)}
+.gtab.active{
+  background:rgba(34,211,238,0.07);
+  border-color:rgba(34,211,238,0.2);
+  color:var(--cyan);
+}
+.guide-content{
+  background:var(--s1);border:1px solid var(--border);border-radius:14px;
+  padding:32px;min-height:320px;
+}
 .guide-panel{display:none}
 .guide-panel.active{display:block}
 
@@ -235,95 +342,228 @@ section{padding:80px 24px}
 }
 .guide-step:last-child{border-bottom:none}
 .gs-num{
-  width:28px;height:28px;border-radius:50%;
+  width:26px;height:26px;border-radius:50%;flex-shrink:0;margin-top:2px;
   background:linear-gradient(135deg,var(--blue),var(--cyan));
   display:flex;align-items:center;justify-content:center;
-  font-family:var(--mono);font-size:11px;font-weight:600;
-  flex-shrink:0;margin-top:2px;
+  font-family:var(--mono);font-size:10px;font-weight:500;color:#fff;
 }
-.gs-content{}
-.gs-title{font-size:15px;font-weight:600;margin-bottom:6px}
-.gs-desc{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:8px}
+.gs-title{font-family:var(--ui);font-size:15px;font-weight:600;margin-bottom:6px;letter-spacing:-0.2px}
+.gs-desc{font-size:13px;color:var(--text2);line-height:1.65;margin-bottom:8px}
+code{background:rgba(255,255,255,0.06);padding:2px 7px;border-radius:4px;font-family:var(--mono);font-size:11px;color:var(--cyan)}
 .gs-tip{
   display:inline-flex;align-items:center;gap:5px;
-  background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.18);
-  border-radius:5px;padding:4px 10px;
-  font-family:var(--mono);font-size:11px;color:var(--orange);
+  background:rgba(251,146,60,0.07);border:1px solid rgba(251,146,60,0.15);
+  border-radius:6px;padding:4px 11px;
+  font-family:var(--mono);font-size:10px;color:var(--orange);letter-spacing:0.2px;
 }
 
-/* ── GESTURES ── */
-.gesture-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:32px}
+/* gestures */
+.gesture-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:20px}
 .gesture-card{
-  background:var(--s1);border:1px solid var(--border);border-radius:10px;
-  padding:18px;text-align:center;
+  background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:10px;
+  padding:18px;display:flex;align-items:flex-start;gap:14px;
 }
-.gesture-emoji{font-size:32px;margin-bottom:10px}
-.gesture-name{font-family:var(--mono);font-size:12px;color:var(--cyan);margin-bottom:4px}
-.gesture-desc{font-size:12px;color:var(--text2)}
+.gesture-emoji{font-size:26px;flex-shrink:0}
+.gesture-name{font-family:var(--mono);font-size:11px;color:var(--cyan);margin-bottom:4px;letter-spacing:0.3px}
+.gesture-desc{font-size:12px;color:var(--text2);line-height:1.5}
 
-/* ── AGENT EXAMPLES ── */
-.agent-examples{margin-top:32px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+/* agent examples */
+.agent-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:900px){.agent-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.agent-grid{grid-template-columns:1fr}}
 .agent-ex{
-  background:var(--s1);border:1px solid var(--border);border-radius:10px;
-  padding:16px;
+  background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:10px;
+  padding:16px;transition:border-color 0.15s;
 }
+.agent-ex:hover{border-color:var(--border2)}
 .agent-ex-query{
-  font-family:var(--mono);font-size:12px;color:var(--text);
-  background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.18);
-  border-radius:6px;padding:8px 12px;margin-bottom:10px;
+  font-family:var(--mono);font-size:11px;color:var(--text);
+  background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.15);
+  border-radius:6px;padding:8px 11px;margin-bottom:10px;letter-spacing:0.2px;
 }
-.agent-ex-result{font-size:12px;color:var(--text2);line-height:1.6}
+.agent-ex-result{font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:10px}
 .agent-ex-badge{
-  display:inline-block;margin-top:8px;
-  font-family:var(--mono);font-size:10px;
-  padding:2px 8px;border-radius:4px;
+  font-family:var(--mono);font-size:9px;font-weight:500;
+  padding:2px 9px;border-radius:4px;letter-spacing:0.4px;
 }
-.badge-green{color:var(--green);background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.18)}
-.badge-blue{color:var(--blue);background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.18)}
-.badge-orange{color:var(--orange);background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.18)}
+.badge-green{color:var(--green);background:rgba(74,222,128,0.07);border:1px solid rgba(74,222,128,0.15)}
+.badge-blue{color:var(--blue);background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.15)}
+.badge-orange{color:var(--orange);background:rgba(251,146,60,0.07);border:1px solid rgba(251,146,60,0.15)}
 
-/* ── CTA SECTION ── */
+/* ── ARCHITECTURE ── */
+.arch-container{margin-top:48px}
+.arch-pipeline{
+  display:flex;flex-direction:column;align-items:center;gap:0;
+}
+/* top: input */
+.arch-input-box{
+  background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.2);
+  border-radius:10px;padding:10px 24px;
+  font-family:var(--mono);font-size:12px;color:var(--cyan);
+  display:flex;align-items:center;gap:8px;letter-spacing:0.3px;
+}
+.arch-arrow{
+  width:1px;height:28px;background:linear-gradient(to bottom,var(--border2),transparent);
+  margin:0 auto;position:relative;
+}
+.arch-arrow::after{
+  content:'▼';position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);
+  font-size:8px;color:var(--text3);
+}
+
+.arch-stages{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:12px;width:100%;margin:8px 0;
+}
+@media(max-width:900px){.arch-stages{grid-template-columns:repeat(2,1fr)}}
+
+.arch-stage{
+  background:var(--s1);border:1px solid var(--border);border-radius:12px;
+  padding:20px;position:relative;
+}
+.arch-stage-num{
+  font-family:var(--mono);font-size:9px;color:var(--text3);
+  text-transform:uppercase;letter-spacing:2px;margin-bottom:10px;
+}
+.arch-stage-icon{font-size:22px;margin-bottom:8px}
+.arch-stage-title{
+  font-family:var(--ui);font-size:14px;font-weight:700;
+  color:var(--text);margin-bottom:6px;letter-spacing:-0.2px;
+}
+.arch-stage-fn{
+  font-family:var(--mono);font-size:10px;color:var(--cyan);
+  margin-bottom:8px;letter-spacing:0.2px;
+}
+.arch-stage-detail{font-size:11px;color:var(--text3);line-height:1.5}
+.arch-stage-badge{
+  display:inline-block;margin-top:10px;
+  font-family:var(--mono);font-size:9px;
+  color:var(--blue);background:rgba(59,130,246,0.07);
+  border:1px solid rgba(59,130,246,0.15);
+  border-radius:4px;padding:2px 8px;
+}
+
+/* arch outputs row */
+.arch-outputs{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:12px;width:100%;margin-top:8px;
+}
+@media(max-width:900px){.arch-outputs{grid-template-columns:repeat(2,1fr)}}
+.arch-output{
+  border-radius:10px;padding:16px;border:1px solid;
+}
+.arch-out-threejs{border-color:rgba(167,139,250,0.2);background:rgba(167,139,250,0.04)}
+.arch-out-gemini{border-color:rgba(34,211,238,0.2);background:rgba(34,211,238,0.04)}
+.arch-out-gitlab{border-color:rgba(251,146,60,0.2);background:rgba(251,146,60,0.04)}
+.arch-out-mp{border-color:rgba(74,222,128,0.2);background:rgba(74,222,128,0.04)}
+.arch-out-icon{font-size:20px;margin-bottom:8px}
+.arch-out-title{font-family:var(--ui);font-size:13px;font-weight:700;margin-bottom:6px}
+.arch-out-items{font-size:11px;color:var(--text2);line-height:1.7}
+.arch-out-items li{list-style:none;display:flex;align-items:center;gap:5px}
+.arch-out-items li::before{content:'·';color:var(--text3)}
+
+/* flow connector above outputs */
+.arch-flow-connector{
+  width:100%;margin:0 auto;
+  display:flex;justify-content:space-around;
+  position:relative;padding:8px 0;
+}
+.arch-flow-connector::before{
+  content:'';
+  position:absolute;top:50%;left:12.5%;right:12.5%;
+  height:1px;background:var(--border2);
+}
+.arch-flow-dot{
+  width:8px;height:8px;border-radius:50%;
+  border:2px solid var(--border2);background:var(--bg);
+  position:relative;z-index:1;
+}
+
+/* ── TECH STACK ── */
+.tech-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:12px;margin-top:52px;
+}
+@media(max-width:900px){.tech-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:480px){.tech-grid{grid-template-columns:1fr}}
+.tech-card{
+  background:var(--s1);border:1px solid var(--border);border-radius:12px;
+  padding:22px;transition:border-color 0.2s,transform 0.2s;
+  display:flex;flex-direction:column;gap:10px;
+}
+.tech-card:hover{border-color:var(--border2);transform:translateY(-2px)}
+.tech-card-top{display:flex;align-items:center;gap:12px}
+.tech-icon{
+  width:40px;height:40px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;font-size:20px;
+  background:rgba(255,255,255,0.04);flex-shrink:0;
+}
+.tech-name{font-family:var(--ui);font-size:14px;font-weight:700;letter-spacing:-0.2px}
+.tech-desc{font-size:12px;color:var(--text2);line-height:1.55}
+.tech-badge{
+  display:inline-block;align-self:flex-start;
+  font-family:var(--mono);font-size:9px;
+  color:var(--cyan);background:rgba(34,211,238,0.06);
+  border:1px solid rgba(34,211,238,0.12);
+  border-radius:4px;padding:2px 8px;letter-spacing:0.4px;
+}
+
+/* primary badge color variations */
+.tech-card:nth-child(1) .tech-badge{color:var(--blue);background:rgba(59,130,246,0.06);border-color:rgba(59,130,246,0.15)}
+.tech-card:nth-child(2) .tech-badge{color:var(--purple);background:rgba(167,139,250,0.06);border-color:rgba(167,139,250,0.15)}
+.tech-card:nth-child(3) .tech-badge{color:var(--orange);background:rgba(251,146,60,0.06);border-color:rgba(251,146,60,0.15)}
+.tech-card:nth-child(5) .tech-badge{color:var(--green);background:rgba(74,222,128,0.06);border-color:rgba(74,222,128,0.15)}
+
+/* ── CTA ── */
 .cta-section{
-  text-align:center;padding:80px 24px 100px;
-  background:linear-gradient(180deg,var(--bg) 0%,rgba(10,15,30,0.8) 100%);
+  padding:80px 40px 100px;text-align:center;
+  position:relative;overflow:hidden;
 }
-.cta-inner{max-width:560px;margin:0 auto}
-.cta-section h2{font-size:clamp(28px,4vw,42px);font-weight:700;letter-spacing:-1px;margin-bottom:14px}
-.cta-section p{font-size:16px;color:var(--text2);margin-bottom:32px}
-.cta-url{
-  display:flex;align-items:center;justify-content:center;
-  background:var(--s1);border:1px solid var(--border2);border-radius:10px;
-  padding:10px 16px;font-family:var(--mono);font-size:13px;
-  color:var(--text2);gap:8px;margin-bottom:20px;cursor:pointer;
-  transition:border-color 0.15s;
+.cta-section::before{
+  content:'';position:absolute;
+  top:0;left:50%;transform:translateX(-50%);
+  width:600px;height:300px;border-radius:50%;
+  background:radial-gradient(ellipse,rgba(34,211,238,0.06) 0%,transparent 70%);
+  pointer-events:none;
 }
-.cta-url:hover{border-color:var(--cyan)}
-.cta-url .url-accent{color:var(--cyan)}
-.cta-links{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;font-size:13px}
-.cta-links a{color:var(--text2);text-decoration:none;display:flex;align-items:center;gap:4px}
+.cta-inner{max-width:540px;margin:0 auto;position:relative}
+.cta-inner h2{
+  font-family:var(--ui);font-size:clamp(32px,4.5vw,52px);
+  font-weight:800;letter-spacing:-1.5px;line-height:1.1;margin-bottom:16px;
+}
+.cta-inner p{font-size:16px;color:var(--text2);margin-bottom:36px;line-height:1.7}
+.cta-url-card{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--s1);border:1px solid var(--border2);border-radius:12px;
+  padding:14px 20px;font-family:var(--mono);font-size:13px;
+  cursor:pointer;transition:border-color 0.15s,background 0.15s;margin-bottom:24px;
+}
+.cta-url-card:hover{border-color:var(--cyan);background:rgba(34,211,238,0.03)}
+.cta-url-text{color:var(--text2)}
+.cta-url-text .accent{color:var(--cyan)}
+.cta-url-arrow{
+  color:#fff;background:linear-gradient(135deg,var(--blue),var(--cyan));
+  padding:6px 14px;border-radius:7px;font-size:12px;font-family:var(--ui);font-weight:600;
+}
+.cta-links{display:flex;gap:24px;justify-content:center;flex-wrap:wrap;font-size:13px}
+.cta-links a{
+  color:var(--text2);text-decoration:none;
+  display:flex;align-items:center;gap:5px;
+  font-family:var(--ui);font-weight:500;
+  transition:color 0.15s;
+}
 .cta-links a:hover{color:var(--cyan)}
 
 /* ── FOOTER ── */
 footer{
-  border-top:1px solid var(--border);padding:24px 40px;
+  border-top:1px solid var(--border);padding:24px 60px;
   display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
 }
-.footer-left{font-family:var(--mono);font-size:11px;color:var(--text3)}
-.footer-right{font-family:var(--mono);font-size:11px;color:var(--text3);display:flex;gap:16px}
-.footer-right a{color:var(--text3);text-decoration:none}
+.footer-left{font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:0.3px}
+.footer-right{font-family:var(--mono);font-size:10px;color:var(--text3);display:flex;gap:18px}
+.footer-right a{color:var(--text3);text-decoration:none;transition:color 0.15s}
 .footer-right a:hover{color:var(--cyan)}
-
-/* ── DIVIDER ── */
-.divider{height:1px;background:var(--border);margin:0}
-
-/* ── FADE IN ANIMATION ── */
-.fade-up{opacity:0;transform:translateY(24px);transition:opacity 0.6s ease,transform 0.6s ease}
-.fade-up.visible{opacity:1;transform:none}
-
-/* scrollbar */
-::-webkit-scrollbar{width:6px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 </style>
 </head>
 <body>
@@ -345,22 +585,26 @@ footer{
   </a>
 </nav>
 
-<!-- HERO -->
+<!-- ═══ HERO ═══ -->
 <section class="hero">
   <canvas class="hero-bg" id="hero-canvas"></canvas>
   <div class="hero-inner">
     <div class="hero-badge">
+      <span class="hero-badge-dot"></span>
       Google Cloud Rapid Agent Hackathon · GitLab Track
     </div>
+
     <h1>
-      Your codebase<br>
-      <span class="line2">has a shape.</span>
+      Your codebase
+      <span class="gradient">has a shape.</span>
     </h1>
+
     <p class="hero-sub">
-      RepoTerrain transforms any GitLab repository into a navigable 3D semantic terrain — 
+      RepoTerrain transforms any GitLab repository into a <strong>navigable 3D semantic terrain</strong> —
       powered by Gemini AI. Files cluster by similarity. Heat shows activity.
       A live agent creates real GitLab issues on command.
     </p>
+
     <div class="hero-btns">
       <a href="https://repoterrain-production.up.railway.app/app" target="_blank" class="btn-primary">
         🚀 Launch App
@@ -369,6 +613,7 @@ footer{
         See how it works ↓
       </a>
     </div>
+
     <div class="hero-stats">
       <div class="hero-stat">
         <div class="hero-stat-num"><span>149</span></div>
@@ -392,7 +637,7 @@ footer{
 
 <div class="divider"></div>
 
-<!-- PROBLEM / SOLUTION -->
+<!-- ═══ PROBLEM / SOLUTION ═══ -->
 <section id="problem">
   <div class="section-inner">
     <div class="fade-up">
@@ -400,24 +645,64 @@ footer{
       <h2 class="section-title">Codebases are invisible</h2>
       <p class="section-sub">Every developer has stared at a repo they've never seen before and had no idea where to start. File trees tell you nothing about relationships, activity, or importance.</p>
     </div>
-    <div class="ps-grid fade-up">
+
+    <div class="ps-visual-grid fade-up">
+      <!-- BEFORE -->
       <div class="ps-card before">
-        <div class="ps-card-label">✕ Before RepoTerrain</div>
+        <div class="ps-card-header">
+          <div class="ps-card-icon">✕</div>
+          <div class="ps-card-label">Before RepoTerrain</div>
+        </div>
         <h3>Navigating blind</h3>
-        <div class="ps-item">Flat file trees with no semantic context or relationships</div>
-        <div class="ps-item">No way to see which files are actively changed vs legacy</div>
-        <div class="ps-item">Onboarding a new repo takes days of reading and grepping</div>
-        <div class="ps-item">Tech debt is invisible — cold zones hide in plain sight</div>
-        <div class="ps-item">Creating issues requires context you don't have yet</div>
+        <div class="ps-item"><div class="ps-dot">✕</div><span>Flat file trees with no semantic context or relationships</span></div>
+        <div class="ps-item"><div class="ps-dot">✕</div><span>No way to see which files are actively changed vs legacy</span></div>
+        <div class="ps-item"><div class="ps-dot">✕</div><span>Onboarding a new repo takes days of reading and grepping</span></div>
+        <div class="ps-item"><div class="ps-dot">✕</div><span>Tech debt is invisible — cold zones hide in plain sight</span></div>
+        <div class="ps-item"><div class="ps-dot">✕</div><span>Creating issues requires context you don't have yet</span></div>
+
+        <!-- visual: flat file tree mockup -->
+        <div class="ps-mockup">
+          <div class="ps-mockup-title">📂 Traditional file tree</div>
+          <div class="filetree">
+            <div class="dir">📁 src/</div>
+            <div class="file">📄 main.go</div>
+            <div class="file">📄 runner.go</div>
+            <div class="file">📄 cache.go</div>
+            <div class="dir">📁 ci/</div>
+            <div class="file">📄 pipeline.go</div>
+            <div class="file">📄 executor.go</div>
+            <div class="file" style="color:var(--text3);font-style:italic">...143 more files</div>
+          </div>
+        </div>
       </div>
+
+      <!-- AFTER -->
       <div class="ps-card after">
-        <div class="ps-card-label">✓ With RepoTerrain</div>
+        <div class="ps-card-header">
+          <div class="ps-card-icon">✓</div>
+          <div class="ps-card-label">With RepoTerrain</div>
+        </div>
         <h3>Seeing the whole shape</h3>
-        <div class="ps-item">Files positioned in 3D space by semantic similarity via Gemini embeddings</div>
-        <div class="ps-item">Heat map shows activity — red peaks are hot, blue valleys are cold</div>
-        <div class="ps-item">Clusters reveal module relationships invisible in the file tree</div>
-        <div class="ps-item">Ask Gemini anything about the terrain — it sees the full picture</div>
-        <div class="ps-item">Create real GitLab issues directly from AI analysis, in seconds</div>
+        <div class="ps-item"><div class="ps-dot">✓</div><span>Files positioned in 3D space by semantic similarity via Gemini embeddings</span></div>
+        <div class="ps-item"><div class="ps-dot">✓</div><span>Heat map shows activity — red peaks are hot, blue valleys are cold</span></div>
+        <div class="ps-item"><div class="ps-dot">✓</div><span>Clusters reveal module relationships invisible in the file tree</span></div>
+        <div class="ps-item"><div class="ps-dot">✓</div><span>Ask Gemini anything about the terrain — it sees the full picture</span></div>
+        <div class="ps-item"><div class="ps-dot">✓</div><span>Create real GitLab issues directly from AI analysis, in seconds</span></div>
+
+        <!-- visual: semantic clusters mockup -->
+        <div class="ps-mockup">
+          <div class="ps-mockup-title">⛰ Semantic terrain clusters</div>
+          <div class="terrain-preview">
+            <div class="t-cluster t-hot"><span class="t-dot"></span>CORE — 18 files</div>
+            <div class="t-cluster t-hot"><span class="t-dot"></span>RUNNER — 12 files</div>
+            <div class="t-cluster t-warm"><span class="t-dot"></span>CI — 21 files</div>
+            <div class="t-cluster t-warm"><span class="t-dot"></span>CACHE — 9 files</div>
+            <div class="t-cluster t-cold"><span class="t-dot"></span>AZURE — 8 files</div>
+            <div class="t-cluster t-cold"><span class="t-dot"></span>TEMPLATES — 14 files</div>
+            <div class="t-cluster t-cold"><span class="t-dot"></span>DOCS — 11 files</div>
+            <div class="t-cluster t-warm"><span class="t-dot"></span>HELPERS — 7 files</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -425,44 +710,45 @@ footer{
 
 <div class="divider"></div>
 
-<!-- HOW IT WORKS -->
+<!-- ═══ HOW IT WORKS ═══ -->
 <section id="how-it-works">
   <div class="section-inner">
     <div class="fade-up">
       <div class="section-label">How It Works</div>
       <h2 class="section-title">From repo URL to 3D terrain in 15 seconds</h2>
-      <p class="section-sub">Four steps. No setup. No cloning. Just paste a GitLab URL.</p>
+      <p class="section-sub">Five steps. No setup. No cloning. Just paste a GitLab URL.</p>
     </div>
-    <div class="steps-grid fade-up">
-      <div class="step-card" data-step="1">
-        <div class="step-num">1</div>
+
+    <div class="steps-row fade-up">
+      <div class="step-card">
+        <div class="step-num-badge">1</div>
         <h3>Fetch</h3>
-        <p>GitLab REST API v4 fetches the full file tree and raw content — up to 150 files, skipping binaries, lock files, and build artifacts.</p>
+        <p>GitLab REST API v4 fetches the full file tree and raw content — up to 150 files, skipping binaries and lock files.</p>
         <span class="step-tag">GitLab API v4</span>
       </div>
-      <div class="step-card" data-step="2">
-        <div class="step-num">2</div>
+      <div class="step-card">
+        <div class="step-num-badge">2</div>
         <h3>Embed</h3>
-        <p>Each file's content is embedded into a 768-dimensional semantic vector using Google AI's text-embedding-004 model. Similar files cluster together in vector space.</p>
+        <p>Each file is embedded into a 768-dim semantic vector using Google AI's text-embedding-004. Similar files cluster in vector space.</p>
         <span class="step-tag">Google AI Embeddings</span>
       </div>
-      <div class="step-card" data-step="3">
-        <div class="step-num">3</div>
+      <div class="step-card">
+        <div class="step-num-badge">3</div>
         <h3>Project</h3>
-        <p>UMAP reduces the 768-dim vectors to 3 dimensions using cosine similarity. The result: files semantically related to each other end up physically near each other in 3D space.</p>
-        <span class="step-tag">UMAP · Cosine Similarity</span>
+        <p>UMAP reduces 768-dim vectors to 3D using cosine similarity. Semantically related files end up physically near each other.</p>
+        <span class="step-tag">UMAP · Cosine</span>
       </div>
-      <div class="step-card" data-step="4">
-        <div class="step-num">4</div>
+      <div class="step-card">
+        <div class="step-num-badge">4</div>
         <h3>Render</h3>
-        <p>Three.js CSS3DRenderer builds the terrain. Each file becomes a floating card. Heat is computed from filename patterns and file size. Cluster labels emerge from directory structure.</p>
+        <p>Three.js CSS3DRenderer builds floating file cards. Heat is computed from filename patterns and file size. Cluster labels emerge.</p>
         <span class="step-tag">Three.js · CSS3D</span>
       </div>
-      <div class="step-card" data-step="5">
-        <div class="step-num">5</div>
+      <div class="step-card">
+        <div class="step-num-badge">5</div>
         <h3>Agent</h3>
-        <p>Gemini 2.0 Flash receives terrain context — hot files, cold files, clusters, selected file content — and answers questions, identifies patterns, and creates real GitLab issues via MCP.</p>
-        <span class="step-tag">Gemini 2.0 Flash · GitLab MCP</span>
+        <p>Gemini 2.0 Flash receives terrain context and answers questions, identifies patterns, and creates real GitLab issues via MCP.</p>
+        <span class="step-tag">Gemini 2.0 · GitLab MCP</span>
       </div>
     </div>
   </div>
@@ -470,7 +756,7 @@ footer{
 
 <div class="divider"></div>
 
-<!-- FIRST-TIME GUIDE -->
+<!-- ═══ GUIDE ═══ -->
 <section id="guide">
   <div class="section-inner">
     <div class="fade-up">
@@ -479,128 +765,138 @@ footer{
       <p class="section-sub">Three things you can do the moment the terrain loads.</p>
     </div>
 
-    <div class="guide-wrap fade-up">
-      <div class="guide-tabs">
-        <div class="gtab active" onclick="switchTab('explore')">🗺 Explore the terrain</div>
-        <div class="gtab" onclick="switchTab('navigate')">✋ Hand navigation</div>
-        <div class="gtab" onclick="switchTab('agent')">🤖 Talk to Gemini</div>
+    <div class="guide-layout fade-up">
+      <div class="guide-sidebar">
+        <div class="gtab active" onclick="switchTab('explore',this)">🗺 Explore the terrain</div>
+        <div class="gtab" onclick="switchTab('navigate',this)">✋ Hand navigation</div>
+        <div class="gtab" onclick="switchTab('agent',this)">🤖 Talk to Gemini</div>
       </div>
 
-      <!-- Tab 1: Explore -->
-      <div class="guide-panel active" id="tab-explore">
-        <div class="guide-steps">
-          <div class="guide-step">
-            <div class="gs-num">1</div>
-            <div class="gs-content">
-              <div class="gs-title">Paste any public GitLab repo URL</div>
-              <div class="gs-desc">Type or paste a path like <code style="background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px;font-family:var(--mono);font-size:12px">gitlab-org/gitlab-runner</code> into the input box. No tokens needed for public repos. Hit Map Terrain and watch the pipeline run — fetch → embed → UMAP → render takes about 15 seconds.</div>
-              <div class="gs-tip">💡 Try gitlab-org/gitlab-runner first — it has 149 files and 19 clusters for a rich terrain</div>
+      <div class="guide-content">
+        <!-- Explore -->
+        <div class="guide-panel active" id="tab-explore">
+          <div class="guide-steps">
+            <div class="guide-step">
+              <div class="gs-num">1</div>
+              <div>
+                <div class="gs-title">Paste any public GitLab repo URL</div>
+                <div class="gs-desc">Type or paste a path like <code>gitlab-org/gitlab-runner</code> into the input. No tokens needed for public repos. Hit Map Terrain — the pipeline takes ~15 seconds.</div>
+                <div class="gs-tip">💡 Try gitlab-org/gitlab-runner first — 149 files, 19 clusters for a rich terrain</div>
+              </div>
             </div>
-          </div>
-          <div class="guide-step">
-            <div class="gs-num">2</div>
-            <div class="gs-content">
-              <div class="gs-title">Read the heat map</div>
-              <div class="gs-desc">Files glow red when they're core/active (main, index, app, router, config patterns + larger file size). Blue files are cold — legacy code, rarely touched docs. Orange is warm — recently active but not core. The color tells you where to look first when onboarding.</div>
-              <div class="gs-tip">🔴 Red peaks = where all the work happens · 🔵 Blue valleys = tech debt candidates</div>
+            <div class="guide-step">
+              <div class="gs-num">2</div>
+              <div>
+                <div class="gs-title">Read the heat map</div>
+                <div class="gs-desc">Files glow red when they're core/active (main, index, app patterns + larger size). Blue files are cold — legacy code. Orange is warm — recently active but not core.</div>
+                <div class="gs-tip">🔴 Red peaks = where all the work happens · 🔵 Blue valleys = tech debt</div>
+              </div>
             </div>
-          </div>
-          <div class="guide-step">
-            <div class="gs-num">3</div>
-            <div class="gs-content">
-              <div class="gs-title">Read the cluster labels</div>
-              <div class="gs-desc">Floating text labels above each cluster show the directory name — CI, CORE, CACHE, AZURE, TEMPLATES. Files that ended up near each other despite being in different directories are semantically similar. These are your hidden module boundaries.</div>
-              <div class="gs-tip">💡 If two files from different dirs cluster together, they share code patterns</div>
+            <div class="guide-step">
+              <div class="gs-num">3</div>
+              <div>
+                <div class="gs-title">Read the cluster labels</div>
+                <div class="gs-desc">Floating labels above each cluster show directory names — CI, CORE, CACHE, AZURE. Files from different directories that cluster together share code patterns.</div>
+                <div class="gs-tip">💡 Cross-directory clusters reveal hidden module boundaries</div>
+              </div>
             </div>
-          </div>
-          <div class="guide-step">
-            <div class="gs-num">4</div>
-            <div class="gs-content">
-              <div class="gs-title">Click any file card</div>
-              <div class="gs-desc">Clicking a floating card flies the camera to that file and opens the file panel on the right. You'll see the language, approximate size, and activity heat percentage. From there, hit "Ask Gemini about this file" to get an instant analysis with surrounding context.</div>
-              <div class="gs-tip">🖱 Mouse: drag to orbit · scroll to zoom · click card to select</div>
+            <div class="guide-step">
+              <div class="gs-num">4</div>
+              <div>
+                <div class="gs-title">Click any file card</div>
+                <div class="gs-desc">Clicking a card flies the camera to that file and opens the file panel — language, size, heat score. Hit "Ask Gemini about this file" for instant analysis with full context.</div>
+                <div class="gs-tip">🖱 Drag to orbit · Scroll to zoom · Click to select</div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Tab 2: Hand nav -->
-      <div class="guide-panel" id="tab-navigate">
-        <div class="guide-steps">
-          <div class="guide-step">
-            <div class="gs-num">1</div>
-            <div class="gs-content">
-              <div class="gs-title">Enable hand tracking</div>
-              <div class="gs-desc">Click the ✋ button in the top-right HUD bar. Your browser will ask for camera permission — allow it. A small webcam preview appears in the bottom-right. MediaPipe initializes in a few seconds, then gesture detection starts automatically.</div>
-              <div class="gs-tip">💡 Works best with good lighting and a clear background behind your hand</div>
+        <!-- Navigate -->
+        <div class="guide-panel" id="tab-navigate">
+          <div class="guide-steps">
+            <div class="guide-step">
+              <div class="gs-num">1</div>
+              <div>
+                <div class="gs-title">Enable hand tracking</div>
+                <div class="gs-desc">Click the ✋ button in the top-right HUD. Your browser asks for camera permission — allow it. A webcam preview appears in the bottom-right. MediaPipe initializes in a few seconds.</div>
+                <div class="gs-tip">💡 Works best with good lighting and a clear background</div>
+              </div>
+            </div>
+          </div>
+          <div class="gesture-grid">
+            <div class="gesture-card">
+              <div class="gesture-emoji">🖐</div>
+              <div>
+                <div class="gesture-name">OPEN PALM</div>
+                <div class="gesture-desc">Move your palm left/right/up/down to orbit the camera through the terrain</div>
+              </div>
+            </div>
+            <div class="gesture-card">
+              <div class="gesture-emoji">🤏</div>
+              <div>
+                <div class="gesture-name">PINCH / VICTORY</div>
+                <div class="gesture-desc">Bring thumb + index together to zoom in, spread to zoom out</div>
+              </div>
+            </div>
+            <div class="gesture-card">
+              <div class="gesture-emoji">☝️</div>
+              <div>
+                <div class="gesture-name">POINT UP</div>
+                <div class="gesture-desc">Point your index finger at a file card to select it and open its details panel</div>
+              </div>
+            </div>
+            <div class="gesture-card">
+              <div class="gesture-emoji">✊</div>
+              <div>
+                <div class="gesture-name">FIST</div>
+                <div class="gesture-desc">Close your fist to grab and rotate the entire terrain view</div>
+              </div>
             </div>
           </div>
         </div>
-        <div class="gesture-grid">
-          <div class="gesture-card">
-            <div class="gesture-emoji">🖐</div>
-            <div class="gesture-name">Open Palm</div>
-            <div class="gesture-desc">Move your palm left/right/up/down to orbit the camera through the terrain</div>
-          </div>
-          <div class="gesture-card">
-            <div class="gesture-emoji">🤏</div>
-            <div class="gesture-name">Pinch / Victory</div>
-            <div class="gesture-desc">Bring thumb and index finger together to zoom in, spread to zoom out</div>
-          </div>
-          <div class="gesture-card">
-            <div class="gesture-emoji">☝️</div>
-            <div class="gesture-name">Point Up</div>
-            <div class="gesture-desc">Point your index finger at a file card to select it and open its details panel</div>
-          </div>
-          <div class="gesture-card">
-            <div class="gesture-emoji">✊</div>
-            <div class="gesture-name">Fist</div>
-            <div class="gesture-desc">Close your fist to grab and rotate the entire terrain view</div>
-          </div>
-        </div>
-      </div>
 
-      <!-- Tab 3: Agent -->
-      <div class="guide-panel" id="tab-agent">
-        <div class="guide-steps">
-          <div class="guide-step">
-            <div class="gs-num">1</div>
-            <div class="gs-content">
-              <div class="gs-title">The agent sees your terrain</div>
-              <div class="gs-desc">Every query to Gemini includes the full terrain context — list of hottest files, coldest files, language clusters, and if you've selected a file, its actual content. The agent isn't answering generically; it's answering about this specific repo.</div>
+        <!-- Agent -->
+        <div class="guide-panel" id="tab-agent">
+          <div class="guide-steps">
+            <div class="guide-step">
+              <div class="gs-num">1</div>
+              <div>
+                <div class="gs-title">The agent sees your terrain</div>
+                <div class="gs-desc">Every Gemini query includes the full terrain context — hottest files, coldest files, language clusters, and selected file content. It's answering about <em>this specific repo</em>.</div>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="agent-examples">
-          <div class="agent-ex">
-            <div class="agent-ex-query">"What's the most complex module?"</div>
-            <div class="agent-ex-result">Gemini analyzes heat scores, file density, and cluster topology to identify the most active and interconnected module with specific filenames.</div>
-            <div class="agent-ex-badge badge-blue">Analysis query</div>
-          </div>
-          <div class="agent-ex">
-            <div class="agent-ex-query">"Explain the CI cluster"</div>
-            <div class="agent-ex-result">Gemini reads the actual content of files in that cluster and explains what they do, how they relate, and what patterns they share — with real filenames.</div>
-            <div class="agent-ex-badge badge-blue">Cluster analysis</div>
-          </div>
-          <div class="agent-ex">
-            <div class="agent-ex-query">"Create an issue for cold zones"</div>
-            <div class="agent-ex-result">Gemini identifies cold files, drafts an issue title and description, then calls the GitLab API — a real issue appears at your repo with labels attached.</div>
-            <div class="agent-ex-badge badge-green">✅ Creates real GitLab issue</div>
-          </div>
-          <div class="agent-ex">
-            <div class="agent-ex-query">"List open MRs"</div>
-            <div class="agent-ex-result">The agent calls the GitLab MCP endpoint and returns live merge requests from the repo — not cached, not hallucinated, fetched in real time.</div>
-            <div class="agent-ex-badge badge-orange">Live GitLab data</div>
-          </div>
-          <div class="agent-ex">
-            <div class="agent-ex-query">"Onboard me to this codebase"</div>
-            <div class="agent-ex-result">Gemini walks you through where to start, what the hot clusters are, what to avoid touching, and which files to read first — a complete onboarding brief.</div>
-            <div class="agent-ex-badge badge-blue">Onboarding mode</div>
-          </div>
-          <div class="agent-ex">
-            <div class="agent-ex-query">Click a file → "Explain this"</div>
-            <div class="agent-ex-result">With a file selected, Gemini gets its full content (up to 3000 chars). The analysis is specific to that exact file — imports, patterns, what it does in context.</div>
-            <div class="agent-ex-badge badge-blue">File-specific analysis</div>
+          <div class="agent-grid" style="margin-top:16px">
+            <div class="agent-ex">
+              <div class="agent-ex-query">"What's the most complex module?"</div>
+              <div class="agent-ex-result">Gemini analyzes heat scores, file density, and cluster topology to identify the most active and interconnected module with specific filenames.</div>
+              <span class="agent-ex-badge badge-blue">Analysis query</span>
+            </div>
+            <div class="agent-ex">
+              <div class="agent-ex-query">"Explain the CI cluster"</div>
+              <div class="agent-ex-result">Gemini reads the actual content of files in that cluster and explains what they do, how they relate, and what patterns they share.</div>
+              <span class="agent-ex-badge badge-blue">Cluster analysis</span>
+            </div>
+            <div class="agent-ex">
+              <div class="agent-ex-query">"Create an issue for cold zones"</div>
+              <div class="agent-ex-result">Gemini identifies cold files, drafts an issue title and description, then calls the GitLab API — a real issue appears with labels attached.</div>
+              <span class="agent-ex-badge badge-green">✅ Creates real GitLab issue</span>
+            </div>
+            <div class="agent-ex">
+              <div class="agent-ex-query">"List open MRs"</div>
+              <div class="agent-ex-result">The agent calls the GitLab MCP endpoint and returns live merge requests — not cached, not hallucinated, fetched in real time.</div>
+              <span class="agent-ex-badge badge-orange">Live GitLab data</span>
+            </div>
+            <div class="agent-ex">
+              <div class="agent-ex-query">"Onboard me to this codebase"</div>
+              <div class="agent-ex-result">Gemini walks you through where to start, what the hot clusters are, what to avoid touching, and which files to read first.</div>
+              <span class="agent-ex-badge badge-blue">Onboarding mode</span>
+            </div>
+            <div class="agent-ex">
+              <div class="agent-ex-query">Click file → "Explain this"</div>
+              <div class="agent-ex-result">With a file selected, Gemini gets its full content (up to 3000 chars). Analysis is specific to that exact file — imports, patterns, context.</div>
+              <span class="agent-ex-badge badge-blue">File-specific analysis</span>
+            </div>
           </div>
         </div>
       </div>
@@ -610,129 +906,214 @@ footer{
 
 <div class="divider"></div>
 
-<!-- ARCHITECTURE -->
+<!-- ═══ ARCHITECTURE ═══ -->
 <section id="architecture">
   <div class="section-inner">
     <div class="fade-up">
       <div class="section-label">Architecture</div>
       <h2 class="section-title">How the pipeline works</h2>
+      <p class="section-sub">From a single GitLab URL to a live 3D terrain with an AI agent — four clean stages.</p>
     </div>
-    <div class="arch-wrap fade-up">
-      <div class="arch-diagram"><span class="hl">RepoTerrain Pipeline</span>
 
-<span class="hl2">INPUT</span>
-  GitLab repo URL  ──►  <span class="hl">POST /ingest</span>
-                              │
-                    ┌─────────▼──────────┐
-                    │  <span class="hl">fetch_repo_files()</span> │   GitLab REST API v4
-                    │  file tree + raw   │   up to 150 files
-                    │  content           │   skips binaries
-                    └─────────┬──────────┘
-                              │
-                    ┌─────────▼──────────┐
-                    │  <span class="hl">embed_files()</span>      │
-                    │  ├─ <span class="hl4">embed_gemini()</span>  │   Google AI text-embedding-004
-                    │  └─ embed_tfidf()  │   TF-IDF fallback (no key)
-                    └─────────┬──────────┘
-                              │  768-dim vectors per file
-                    ┌─────────▼──────────┐
-                    │  <span class="hl">project_to_3d()</span>    │   UMAP · cosine metric
-                    │  768-dim → (x,y,z) │   n_neighbors=15
-                    └─────────┬──────────┘
-                              │  terrain JSON → session cache
-              ┌───────────────┼───────────────────┐
-              │               │                   │
-    ┌─────────▼──────┐  ┌─────▼──────┐  ┌────────▼───────┐
-    │  <span class="hl">Three.js</span>       │  │  <span class="hl">Gemini</span>     │  │  <span class="hl">GitLab MCP</span>    │
-    │  CSS3DRenderer │  │  2.0 Flash │  │  create_issue  │
-    │  File cards    │  │  Agent Q&A │  │  list_mrs      │
-    │  Cluster labels│  │  Groq      │  │  get_pipelines │
-    │  Heat map      │  │  fallback  │  │                │
-    │  Orbit + zoom  │  │            │  │                │
-    └────────────────┘  └────────────┘  └────────────────┘
-              │
-    ┌─────────▼──────┐
-    │  <span class="hl">MediaPipe</span>      │
-    │  Hand tracking │
-    │  Gesture nav   │
-    └────────────────┘</div>
+    <div class="arch-container fade-up">
+      <!-- Input -->
+      <div style="display:flex;justify-content:center;margin-bottom:0">
+        <div class="arch-input-box">
+          <span style="color:var(--text3)">INPUT</span>
+          &nbsp;·&nbsp;
+          <span>GitLab Repo URL</span>
+          &nbsp;→&nbsp;
+          <span style="color:var(--blue)">POST /ingest</span>
+        </div>
+      </div>
+      <div class="arch-arrow"></div>
+
+      <!-- 4 pipeline stages -->
+      <div class="arch-stages">
+        <div class="arch-stage">
+          <div class="arch-stage-num">Stage 01</div>
+          <div class="arch-stage-icon">🦊</div>
+          <div class="arch-stage-title">Fetch</div>
+          <div class="arch-stage-fn">fetch_repo_files()</div>
+          <div class="arch-stage-detail">
+            GitLab REST API v4<br>
+            Up to 150 files<br>
+            Skips binaries &amp; lockfiles<br>
+            Raw content extraction
+          </div>
+          <span class="arch-stage-badge">GitLab API v4</span>
+        </div>
+        <div class="arch-stage">
+          <div class="arch-stage-num">Stage 02</div>
+          <div class="arch-stage-icon">🧠</div>
+          <div class="arch-stage-title">Embed</div>
+          <div class="arch-stage-fn">embed_files()</div>
+          <div class="arch-stage-detail">
+            Primary: embed_gemini()<br>
+            text-embedding-004<br>
+            768-dim vectors/file<br>
+            Fallback: TF-IDF (no key)
+          </div>
+          <span class="arch-stage-badge">Google AI Embeddings</span>
+        </div>
+        <div class="arch-stage">
+          <div class="arch-stage-num">Stage 03</div>
+          <div class="arch-stage-icon">🗺</div>
+          <div class="arch-stage-title">Project</div>
+          <div class="arch-stage-fn">project_to_3d()</div>
+          <div class="arch-stage-detail">
+            UMAP dimensionality reduction<br>
+            768-dim → (x, y, z)<br>
+            Cosine similarity metric<br>
+            n_neighbors = 15
+          </div>
+          <span class="arch-stage-badge">UMAP · Cosine</span>
+        </div>
+        <div class="arch-stage">
+          <div class="arch-stage-num">Stage 04</div>
+          <div class="arch-stage-icon">💾</div>
+          <div class="arch-stage-title">Cache</div>
+          <div class="arch-stage-fn">session_cache</div>
+          <div class="arch-stage-detail">
+            Terrain JSON stored per session<br>
+            Hot/cold scores computed<br>
+            Cluster labels derived<br>
+            Ready for all consumers
+          </div>
+          <span class="arch-stage-badge">Session Cache</span>
+        </div>
+      </div>
+
+      <!-- connector to outputs -->
+      <div class="arch-flow-connector">
+        <div class="arch-flow-dot"></div>
+        <div class="arch-flow-dot"></div>
+        <div class="arch-flow-dot"></div>
+        <div class="arch-flow-dot"></div>
+      </div>
+
+      <!-- 4 outputs -->
+      <div class="arch-outputs">
+        <div class="arch-output arch-out-threejs">
+          <div class="arch-out-icon">⛰</div>
+          <div class="arch-out-title" style="color:var(--purple)">Three.js</div>
+          <ul class="arch-out-items">
+            <li>CSS3DRenderer</li>
+            <li>Floating file cards</li>
+            <li>Cluster labels</li>
+            <li>Heat map colors</li>
+            <li>Orbit + zoom</li>
+          </ul>
+        </div>
+        <div class="arch-output arch-out-gemini">
+          <div class="arch-out-icon">🤖</div>
+          <div class="arch-out-title" style="color:var(--cyan)">Gemini Agent</div>
+          <ul class="arch-out-items">
+            <li>Gemini 2.0 Flash (primary)</li>
+            <li>Groq LLaMA 3.1 (fallback)</li>
+            <li>Terrain Q&amp;A</li>
+            <li>Codebase analysis</li>
+          </ul>
+        </div>
+        <div class="arch-output arch-out-gitlab">
+          <div class="arch-out-icon">🦊</div>
+          <div class="arch-out-title" style="color:var(--orange)">GitLab MCP</div>
+          <ul class="arch-out-items">
+            <li>create_issue()</li>
+            <li>list_mrs()</li>
+            <li>get_pipelines()</li>
+            <li>Live API calls</li>
+          </ul>
+        </div>
+        <div class="arch-output arch-out-mp">
+          <div class="arch-out-icon">✋</div>
+          <div class="arch-out-title" style="color:var(--green)">MediaPipe</div>
+          <ul class="arch-out-items">
+            <li>Hand tracking</li>
+            <li>4 gesture types</li>
+            <li>Real-time webcam</li>
+            <li>Touchless nav</li>
+          </ul>
+        </div>
+      </div>
     </div>
   </div>
 </section>
 
 <div class="divider"></div>
 
-<!-- TECH STACK -->
+<!-- ═══ TECH STACK ═══ -->
 <section id="tech-stack">
   <div class="section-inner">
     <div class="fade-up">
       <div class="section-label">Tech Stack</div>
       <h2 class="section-title">Built with the right tools</h2>
+      <p class="section-sub">Every component chosen for performance, reliability, and hackathon compliance.</p>
     </div>
     <div class="tech-grid fade-up">
       <div class="tech-card">
-        <div class="tech-icon">🤖</div>
-        <div class="tech-info">
+        <div class="tech-card-top">
+          <div class="tech-icon">🤖</div>
           <div class="tech-name">Gemini 2.0 Flash</div>
-          <div class="tech-desc">Agent reasoning, codebase Q&A, issue drafting</div>
-          <div class="tech-badge">Google Cloud AI</div>
         </div>
+        <div class="tech-desc">Agent reasoning, codebase Q&A, terrain analysis, and issue drafting with full terrain context.</div>
+        <span class="tech-badge">Google Cloud AI</span>
       </div>
       <div class="tech-card">
-        <div class="tech-icon">🧠</div>
-        <div class="tech-info">
+        <div class="tech-card-top">
+          <div class="tech-icon">🧠</div>
           <div class="tech-name">text-embedding-004</div>
-          <div class="tech-desc">768-dim semantic file vectors for UMAP projection</div>
-          <div class="tech-badge">Google AI Embeddings</div>
         </div>
+        <div class="tech-desc">Produces 768-dimensional semantic vectors per file for UMAP projection into 3D space.</div>
+        <span class="tech-badge">Google AI Embeddings</span>
       </div>
       <div class="tech-card">
-        <div class="tech-icon">🦊</div>
-        <div class="tech-info">
+        <div class="tech-card-top">
+          <div class="tech-icon">🦊</div>
           <div class="tech-name">GitLab REST API v4</div>
-          <div class="tech-desc">File fetch, issue creation, MR listing, pipeline status</div>
-          <div class="tech-badge">GitLab MCP</div>
         </div>
+        <div class="tech-desc">File fetching, issue creation, MR listing, and pipeline status — all live, no caching.</div>
+        <span class="tech-badge">GitLab MCP</span>
       </div>
       <div class="tech-card">
-        <div class="tech-icon">🗺</div>
-        <div class="tech-info">
+        <div class="tech-card-top">
+          <div class="tech-icon">🗺</div>
           <div class="tech-name">UMAP</div>
-          <div class="tech-desc">Reduces 768-dim vectors to 3D coordinates using cosine distance</div>
-          <div class="tech-badge">Dimensionality Reduction</div>
         </div>
+        <div class="tech-desc">Reduces 768-dim embedding vectors to 3D (x,y,z) coordinates using cosine distance metric.</div>
+        <span class="tech-badge">Dimensionality Reduction</span>
       </div>
       <div class="tech-card">
-        <div class="tech-icon">⛰</div>
-        <div class="tech-info">
+        <div class="tech-card-top">
+          <div class="tech-icon">⛰</div>
           <div class="tech-name">Three.js r128</div>
-          <div class="tech-desc">CSS3DRenderer for floating file cards, WebGL for edges and particles</div>
-          <div class="tech-badge">3D Rendering</div>
         </div>
+        <div class="tech-desc">CSS3DRenderer for floating file cards, WebGL for edges and particles, OrbitControls for navigation.</div>
+        <span class="tech-badge">3D Rendering</span>
       </div>
       <div class="tech-card">
-        <div class="tech-icon">✋</div>
-        <div class="tech-info">
-          <div class="tech-name">MediaPipe Tasks Vision</div>
-          <div class="tech-desc">Real-time hand gesture recognition for touchless navigation</div>
-          <div class="tech-badge">Hand Tracking</div>
+        <div class="tech-card-top">
+          <div class="tech-icon">✋</div>
+          <div class="tech-name">MediaPipe Tasks</div>
         </div>
+        <div class="tech-desc">Real-time hand gesture recognition: palm orbit, pinch zoom, point select, fist rotate.</div>
+        <span class="tech-badge">Hand Tracking</span>
       </div>
       <div class="tech-card">
-        <div class="tech-icon">⚡</div>
-        <div class="tech-info">
+        <div class="tech-card-top">
+          <div class="tech-icon">⚡</div>
           <div class="tech-name">FastAPI + uvicorn</div>
-          <div class="tech-desc">Async backend, WebSocket agent, session cache</div>
-          <div class="tech-badge">Python Backend</div>
         </div>
+        <div class="tech-desc">Async Python backend with WebSocket agent streaming, session cache, and Railway deployment.</div>
+        <span class="tech-badge">Python Backend</span>
       </div>
       <div class="tech-card">
-        <div class="tech-icon">🚄</div>
-        <div class="tech-info">
+        <div class="tech-card-top">
+          <div class="tech-icon">🚄</div>
           <div class="tech-name">Groq LLaMA 3.1</div>
-          <div class="tech-desc">Fallback agent when Gemini unavailable — same API surface</div>
-          <div class="tech-badge">Fallback LLM</div>
         </div>
+        <div class="tech-desc">Automatic fallback agent when Gemini is unavailable — same API surface, seamless degradation.</div>
+        <span class="tech-badge">Fallback LLM</span>
       </div>
     </div>
   </div>
@@ -740,14 +1121,16 @@ footer{
 
 <div class="divider"></div>
 
-<!-- CTA -->
+<!-- ═══ CTA ═══ -->
 <section class="cta-section">
   <div class="cta-inner fade-up">
     <h2>See your codebase<br>in a new dimension</h2>
     <p>Paste any public GitLab repo. Terrain loads in ~15 seconds. No sign-up required.</p>
-    <div class="cta-url" onclick="window.open('https://repoterrain-production.up.railway.app/app','_blank')">
-      <span class="url-accent">repoterrain-production.up.railway.app</span><span style="color:var(--text3)">/app</span>
-      <span style="margin-left:auto;color:var(--cyan);font-size:12px">Open →</span>
+    <div class="cta-url-card" onclick="window.open('https://repoterrain-production.up.railway.app/app','_blank')">
+      <div class="cta-url-text">
+        <span class="accent">repoterrain-production.up.railway.app</span><span>/app</span>
+      </div>
+      <div class="cta-url-arrow">Open →</div>
     </div>
     <div class="cta-links">
       <a href="https://github.com/ashish-doing/repoterrain" target="_blank">⭐ GitHub</a>
@@ -757,7 +1140,7 @@ footer{
   </div>
 </section>
 
-<!-- FOOTER -->
+<!-- ═══ FOOTER ═══ -->
 <footer>
   <div class="footer-left">RepoTerrain · Google Cloud Rapid Agent Hackathon 2026 · GitLab Track · MIT License</div>
   <div class="footer-right">
@@ -768,31 +1151,31 @@ footer{
 </footer>
 
 <script>
-// animated bg
+// ── CANVAS BACKGROUND ──
 const canvas = document.getElementById('hero-canvas');
 const ctx = canvas.getContext('2d');
-let W, H, dots;
-function resize() {
-  W = canvas.width = window.innerWidth;
-  H = canvas.height = window.innerHeight;
-}
+let W, H;
+function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
 resize();
 window.addEventListener('resize', resize);
-dots = Array.from({length:70}, () => ({
+
+const dots = Array.from({length:80}, () => ({
   x:Math.random()*window.innerWidth, y:Math.random()*window.innerHeight,
-  r:Math.random()*1.3+0.4,
-  vx:(Math.random()-0.5)*0.2, vy:(Math.random()-0.5)*0.2,
+  r:Math.random()*1.5+0.3,
+  vx:(Math.random()-0.5)*0.18, vy:(Math.random()-0.5)*0.18,
+  hue: Math.random() > 0.5 ? 200 : 185
 }));
+
 function drawBg() {
   ctx.clearRect(0,0,W,H);
   for (let i=0;i<dots.length;i++) {
     for (let j=i+1;j<dots.length;j++) {
       const dx=dots[i].x-dots[j].x, dy=dots[i].y-dots[j].y;
       const d=Math.sqrt(dx*dx+dy*dy);
-      if (d<140) {
+      if (d<160) {
         ctx.beginPath();
-        ctx.strokeStyle=`rgba(59,130,246,${0.03*(1-d/140)})`;
-        ctx.lineWidth=0.5;
+        ctx.strokeStyle=`rgba(34,211,238,${0.025*(1-d/160)})`;
+        ctx.lineWidth=0.4;
         ctx.moveTo(dots[i].x,dots[i].y);
         ctx.lineTo(dots[j].x,dots[j].y);
         ctx.stroke();
@@ -800,7 +1183,7 @@ function drawBg() {
     }
     ctx.beginPath();
     ctx.arc(dots[i].x,dots[i].y,dots[i].r,0,Math.PI*2);
-    ctx.fillStyle='rgba(59,130,246,0.3)';
+    ctx.fillStyle=dots[i].hue===200?'rgba(59,130,246,0.35)':'rgba(34,211,238,0.25)';
     ctx.fill();
     dots[i].x+=dots[i].vx; dots[i].y+=dots[i].vy;
     if(dots[i].x<0||dots[i].x>W) dots[i].vx*=-1;
@@ -810,17 +1193,21 @@ function drawBg() {
 }
 drawBg();
 
-// fade-up observer
+// ── SCROLL FADE ──
 const obs = new IntersectionObserver(entries => {
-  entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
-}, {threshold:0.1});
+  entries.forEach((e,i) => {
+    if(e.isIntersecting) {
+      setTimeout(() => e.target.classList.add('visible'), 0);
+    }
+  });
+}, {threshold:0.08});
 document.querySelectorAll('.fade-up').forEach(el => obs.observe(el));
 
-// guide tabs
-function switchTab(name) {
+// ── GUIDE TABS ──
+function switchTab(name, el) {
   document.querySelectorAll('.gtab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.guide-panel').forEach(p => p.classList.remove('active'));
-  event.target.closest('.gtab').classList.add('active');
+  el.classList.add('active');
   document.getElementById('tab-'+name).classList.add('active');
 }
 </script>
