@@ -11,17 +11,22 @@
   <img src="https://img.shields.io/badge/Three.js-CSS3D%20Terrain-000000?style=for-the-badge&logo=three.js&logoColor=white" />
   <img src="https://img.shields.io/badge/MediaPipe-Hand%20Tracking-00BCD4?style=for-the-badge&logo=google&logoColor=white" />
   <img src="https://img.shields.io/badge/FastAPI-Backend-009688?style=for-the-badge&logo=fastapi&logoColor=white" />
-  <img src="https://img.shields.io/badge/UMAP-3D%20Projection-FF6B35?style=for-the-badge" />
 </p>
 
 <br/>
 
-> **Google Cloud Rapid Agent Hackathon — GitLab Track — June 2026**  
-> Transform any GitLab repository into a navigable 3D semantic terrain. Files float as cards positioned by AI similarity. A Gemini agent analyzes hotspots and creates real GitLab issues via MCP — all navigable with bare hands.
+> **Google Cloud Rapid Agent Hackathon — GitLab Track — June 2026**
+> Transform any GitLab repository into a navigable 3D semantic terrain. Files float as cards positioned by AI similarity. A Gemini agent analyzes the codebase and creates real GitLab issues via MCP — all navigable with bare hands.
 
 <p>
   <a href="https://repoterrain-production.up.railway.app/app">
-    <img src="https://img.shields.io/badge/%F0%9F%9A%80%20Live%20Demo-Railway-0B0D0E?style=for-the-badge" />
+    <img src="https://img.shields.io/badge/%F0%9F%9A%80%20Live%20App-Railway-0B0D0E?style=for-the-badge" />
+  </a>
+  <a href="https://repoterrain-production.up.railway.app/">
+    <img src="https://img.shields.io/badge/%F0%9F%8C%90%20Landing%20Page-docs-00E5FF?style=for-the-badge" />
+  </a>
+  <a href="https://github.com/ashish-doing/repoterrain/blob/main/ARCHITECTURE.md">
+    <img src="https://img.shields.io/badge/%F0%9F%93%90%20Architecture-deep%20dive-6B4FFF?style=for-the-badge" />
   </a>
   <a href="https://github.com/ashish-doing/repoterrain">
     <img src="https://img.shields.io/badge/GitHub-ashish--doing%2Frepoterrain-181717?style=for-the-badge&logo=github" />
@@ -34,66 +39,41 @@
 
 ---
 
-## Why RepoTerrain Wins
+## Demo Video
 
-| Judging Criterion | How RepoTerrain Delivers |
-|---|---|
-| **Tech Implementation** | Gemini 2.0 Flash agent + Google AI embeddings + real GitLab MCP actions |
-| **Design** | Only submission with 3D semantic terrain — judges will remember it |
-| **Potential Impact** | Turns opaque codebases into navigable spaces — onboarding, code review, tech debt |
-| **Idea Quality** | Novel visualization layer on top of agentic GitLab workflow — no competitor has this |
+<!-- Replace VIDEO_ID with your YouTube video ID after recording -->
+[![RepoTerrain Demo](https://img.youtube.com/vi/VIDEO_ID/maxresdefault.jpg)](https://youtu.be/VIDEO_ID)
+
+▶ **[Watch the demo on YouTube](https://youtu.be/VIDEO_ID)**
+
+> 3-minute walkthrough: terrain load → agent Q&A → live GitLab issue creation
 
 ---
 
 ## What It Does
 
-Paste any GitLab repository URL. In ~15 seconds:
+Paste any public GitLab repository URL. In ~15 seconds:
 
-- **149 files** are fetched, embedded, and projected into 3D space via UMAP
-- **19 semantic clusters** emerge — files positioned by code similarity, not folder structure
-- **Heat map** shows activity: red = hot (core logic), blue = cold (legacy/docs)
-- **Gemini agent** answers questions about the codebase with real file context
-- **GitLab MCP** creates real issues, lists MRs, fetches pipeline status — live
+- **Up to 150 files** are fetched, embedded with Google AI, and projected into 3D space via UMAP
+- **Semantic clusters** emerge — files grouped by code similarity, not folder structure
+- **Activity heat map** shows which code is active (red) vs legacy (blue)
+- **Gemini 2.0 Flash agent** answers questions with real file content as context
+- **GitLab MCP actions** create real issues, list MRs, and fetch pipeline status — live
 
 ```
-gitlab-org/gitlab-runner (149 files, 19 clusters, ~15s)
-        │
-        ▼
-GitLab REST API → file tree + content
-        │
-        ▼
-Google AI text-embedding-004 (768-dim) — or TF-IDF fallback
-        │
-        ▼
-UMAP 3D projection → (x, y, z) per file
-        │
-        ├── Three.js CSS3DRenderer — floating file cards, cluster labels, edges
-        ├── MediaPipe Hand Tracking — Open Palm / Pinch / Point gestures
-        └── Gemini 2.0 Flash agent + GitLab MCP
-            → analyze clusters | create issues | list MRs | fetch pipelines
+Tested on gitlab-org/gitlab-runner → 149 files · 24 clusters · ~15s end-to-end
 ```
 
 ---
 
-## Demo
-
-### Landing Page
-Paste any public GitLab repo URL and watch it transform.
-
-### 3D Terrain View
-- **149 floating file cards** — real filenames, language icons, heat bars
-- **19 cluster labels** — CI, CORE, DOCS, AZURE, CACHE etc floating above module groups
-- **Color-coded heat** — red peaks = active code, blue valleys = legacy
-- **Orbit, zoom, flyTo** — click any card to fly the camera to it
-
-### Agent in Action
+## Agent in Action
 
 | Query | What Happens |
 |---|---|
-| `"What's the most complex module?"` | Gemini analyzes terrain + real file content → structured answer |
-| `"Create an issue for cold zones"` | Real GitLab issue created at `ashish-doing/repoterrain-demo` with labels |
-| `"Explain the CI cluster"` | Reads actual CI files, explains relationships |
-| `"List open MRs"` | Fetches live MRs via GitLab API |
+| `"What's the most complex module?"` | Gemini reads file content → structured analysis with cluster context |
+| `"Create an issue for cold zones"` | Real GitLab issue created at `ashish-doing/repoterrain-demo` with labels + clickable URL in chat |
+| `"Explain the CI cluster"` | Reads actual CI files, explains module relationships |
+| `"List open MRs"` | Fetches live merge requests via GitLab API |
 
 ---
 
@@ -103,90 +83,54 @@ Paste any public GitLab repo URL and watch it transform.
 |---|---|---|
 | **AI Embeddings** | Google AI `text-embedding-004` | 768-dim semantic file vectors |
 | **AI Agent** | Gemini 2.0 Flash | Codebase Q&A + action reasoning |
-| **Fallback LLM** | Groq LLaMA 3.1 8B | Agent fallback when Gemini unavailable |
-| **Fallback Embed** | TF-IDF (sklearn) | Embedding fallback — ~3s vs 768-dim |
-| **3D Engine** | Three.js r128 + CSS3DRenderer | File cards floating in semantic space |
-| **Hand Tracking** | MediaPipe Tasks Vision | Gesture navigation |
+| **Fallback LLM** | Groq LLaMA 3.1 8B | Agent fallback when Gemini quota exceeded |
+| **Fallback Embed** | TF-IDF (sklearn) | Embedding fallback (~2.8s vs ~15s Gemini) |
+| **3D Engine** | Three.js r128 + CSS3DRenderer | Floating file cards in semantic space |
+| **Hand Tracking** | MediaPipe Tasks Vision | Gesture-based terrain navigation |
 | **Dim Reduction** | UMAP | High-dim vectors → 3D coordinates |
-| **GitLab Actions** | GitLab REST API v4 | Real issue creation, MR listing, pipelines |
-| **Backend** | FastAPI + uvicorn | Pipeline API + WebSocket agent |
+| **GitLab Actions** | GitLab REST API v4 | Issue creation, MR listing, pipelines |
+| **Backend** | FastAPI + uvicorn | Ingest pipeline + agent API + WebSocket |
 | **Deployment** | Railway | Live public URL |
 
 ---
 
 ## Architecture
 
+See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full system diagram with data flow, state schema, and component breakdown.
+
+**Short version:**
+
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     RepoTerrain Backend                     │
-│                                                             │
-│  POST /ingest                                               │
-│  ├── fetch_repo_files()  ← GitLab REST API v4               │
-│  │   └── file tree + raw content (up to 150 files)          │
-│  │                                                          │
-│  ├── embed_files()                                          │
-│  │   ├── embed_gemini()  ← Google AI text-embedding-004     │
-│  │   └── embed_tfidf()   ← sklearn fallback                 │
-│  │                                                          │
-│  ├── project_to_3d()  ← UMAP (cosine, 3 components)        │
-│  │                                                          │
-│  └── compute_metadata()  → nodes, edges, heat scores        │
-│                                                             │
-│  POST /agent/query                                          │
-│  ├── call_gemini()  ← Gemini 2.0 Flash                      │
-│  ├── call_groq()    ← LLaMA 3.1 8B fallback                 │
-│  └── execute_gitlab_actions()  ← GitLab API v4 MCP          │
-│      ├── gitlab_create_issue()                              │
-│      ├── gitlab_list_mrs()                                  │
-│      └── gitlab_get_pipelines()                             │
-│                                                             │
-│  WS /ws/{session_id}  ← real-time agent updates            │
-└─────────────────────────────────────────────────────────────┘
-            │
-            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    RepoTerrain Frontend                     │
-│                                                             │
-│  Three.js CSS3DRenderer                                     │
-│  ├── 149 floating file cards (real filenames + heat bars)   │
-│  ├── 19 cluster labels (CSS3D billboards)                   │
-│  ├── Edge lines (semantic connections)                      │
-│  └── Particle background                                    │
-│                                                             │
-│  MediaPipe Hand Tracking                                    │
-│  ├── Open Palm → camera fly                                 │
-│  ├── Pinch → zoom                                           │
-│  └── Point → file select + agent query                      │
-│                                                             │
-│  Gemini Agent Panel                                         │
-│  ├── Real file content context per query                    │
-│  ├── Clickable issue URLs in chat                           │
-│  └── Conversation history (last 16 turns)                  │
-└─────────────────────────────────────────────────────────────┘
+GitLab REST API → Google AI Embeddings → UMAP 3D → Three.js terrain
+                                                  ↓
+                              Gemini 2.0 Flash agent + GitLab MCP actions
 ```
 
 ---
 
 ## Hackathon Compliance
 
-- ✅ **Google Cloud AI** — Gemini 2.0 Flash agent + `text-embedding-004` embeddings
-- ✅ **GitLab MCP actions** — real issue creation, MR listing, pipeline fetch via GitLab API v4
-- ✅ **Agent takes actions** — not just a chatbot; creates real artifacts on GitLab
-- ✅ **New project** — first commit May 23, 2026 (hackathon started May 5)
-- ✅ **Public repo** — MIT license
-- ✅ **Live demo** — deployed on Railway, accessible 24/7
+| Requirement | Status |
+|---|---|
+| Google Cloud AI (Gemini) | ✅ Gemini 2.0 Flash — agent reasoning |
+| Google Cloud AI (Embeddings) | ✅ `text-embedding-004` — semantic file positioning |
+| GitLab MCP actions | ✅ Real issue creation, MR listing, pipeline fetch |
+| Agent takes real actions | ✅ Creates artifacts on GitLab, not just chat responses |
+| New project | ✅ First commit May 23, 2026 (hackathon opened May 5) |
+| Public repo + live demo | ✅ MIT license, deployed on Railway |
 
 ---
 
-## Live Demo
+## Performance
 
-```
-https://repoterrain-production.up.railway.app/app
-```
-
-Try with: `gitlab-org/gitlab-runner` — loads 149 files in ~15 seconds.
-
-Then ask the agent: `"Create an issue for cold zones"` — watch a real GitLab issue appear with a clickable URL.
+| Metric | Value |
+|---|---|
+| Files analyzed | Up to 150 per repo |
+| Embedding (TF-IDF fallback) | ~2.8 seconds |
+| Embedding (Google AI) | ~15 seconds (768-dim vectors) |
+| End-to-end terrain load | ~15 seconds |
+| Agent response | ~2s (Groq) / ~3s (Gemini) |
+| Issue creation | ~1 second |
 
 ---
 
@@ -198,9 +142,9 @@ cd repoterrain/backend
 pip install -r requirements.txt
 
 # Create .env
-echo "GEMINI_API_KEY=your_key_here" >> .env
-echo "GROQ_API_KEY=your_key_here" >> .env
-echo "GITLAB_TOKEN=your_token_here" >> .env
+GEMINI_API_KEY=your_key_here
+GROQ_API_KEY=your_key_here
+GITLAB_TOKEN=your_token_here
 
 uvicorn main:app --reload --port 8080
 # Open: http://localhost:8080/app
@@ -210,9 +154,9 @@ uvicorn main:app --reload --port 8080
 
 | Variable | Purpose | Required |
 |---|---|---|
-| `GEMINI_API_KEY` | Gemini 2.0 Flash agent + text-embedding-004 | Recommended |
-| `GROQ_API_KEY` | LLaMA 3.1 fallback when Gemini unavailable | Recommended |
-| `GITLAB_TOKEN` | Real issue creation + MR/pipeline fetch | For MCP actions |
+| `GEMINI_API_KEY` | Gemini 2.0 Flash + text-embedding-004 | Recommended |
+| `GROQ_API_KEY` | LLaMA 3.1 fallback | Recommended |
+| `GITLAB_TOKEN` | Issue creation + MR/pipeline fetch | For MCP actions |
 
 ---
 
@@ -221,27 +165,15 @@ uvicorn main:app --reload --port 8080
 ```
 repoterrain/
 ├── backend/
-│   ├── main.py          FastAPI app — /ingest, /agent/query, /ws, /app
+│   ├── main.py          FastAPI — /ingest, /agent/query, /ws, /app, /
 │   ├── pipeline.py      GitLab fetch → embed → UMAP → terrain JSON
 │   ├── agent.py         Gemini 2.0 Flash + Groq fallback + GitLab MCP
-│   ├── index.html       Full frontend (Three.js + MediaPipe + agent UI)
+│   ├── index.html       Frontend (Three.js + MediaPipe + agent panel)
+│   ├── landing.html     Product landing page
 │   └── requirements.txt
+├── ARCHITECTURE.md
 └── README.md
 ```
-
----
-
-## Performance
-
-| Metric | Value |
-|---|---|
-| Files analyzed | Up to 150 per repo |
-| Embedding time (TF-IDF) | ~2.8 seconds |
-| Embedding time (Gemini) | ~15 seconds (768-dim) |
-| Terrain load time | ~15 seconds end-to-end |
-| Agent response time | ~2 seconds (Groq) / ~3 seconds (Gemini) |
-| Issue creation time | ~1 second |
-| Tested on | `gitlab-org/gitlab-runner` — 149 files, 19 clusters |
 
 ---
 
