@@ -46,13 +46,15 @@
     .splash-bg-canvas { position: absolute; inset: 0; z-index: 0; }
     .splash-inner { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; text-align: center; }
     .splash-logo-ring {
-      width: 86px; height: 86px; border-radius: 22px;
-      background: linear-gradient(135deg, #3b82f6, #06b6d4);
-      display: flex; align-items: center; justify-content: center; font-size: 42px;
+      width: 88px; height: 88px; border-radius: 20px;
+      background: #1a1f2e;
+      border: 1.5px solid rgba(59,130,246,0.35);
+      display: flex; align-items: center; justify-content: center;
       margin-bottom: 26px;
-      box-shadow: 0 0 60px rgba(6,182,212,0.4), 0 0 120px rgba(6,182,212,0.15);
+      box-shadow: 0 0 40px rgba(59,130,246,0.25), 0 0 80px rgba(59,130,246,0.1);
       animation: splashPulse 2s ease infinite;
     }
+    .splash-logo-ring svg { width: 52px; height: 52px; }
     @keyframes splashPulse {
       0%,100% { box-shadow: 0 0 60px rgba(6,182,212,0.4), 0 0 120px rgba(6,182,212,0.15); }
       50% { box-shadow: 0 0 80px rgba(6,182,212,0.65), 0 0 160px rgba(6,182,212,0.25); }
@@ -91,12 +93,13 @@
     }
     .logo-wrap { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 22px; }
     .logo-icon {
-      width: 36px; height: 36px; border-radius: 9px;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      display: flex; align-items: center; justify-content: center; font-size: 18px;
-      box-shadow: 0 0 18px rgba(6,182,212,0.35);
+      width: 36px; height: 36px; border-radius: 8px;
+      background: #1a1f2e; border: 1px solid rgba(59,130,246,0.3);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 12px rgba(59,130,246,0.2);
     }
-    .logo-name { font-family: var(--mono); font-size: 19px; font-weight: 600; letter-spacing: -0.3px; }
+    .logo-icon svg { width: 20px; height: 20px; }
+    .logo-name { font-family: var(--ui); font-size: 19px; font-weight: 700; letter-spacing: -0.3px; color: #fff; }
     .logo-name em { color: var(--accent2); font-style: normal; }
     .hero-h1 { font-size: clamp(20px,3.5vw,28px); font-weight: 700; line-height: 1.25; letter-spacing: -0.6px; color: var(--text); margin-bottom: 10px; }
     .hero-h1 .grad { background: linear-gradient(135deg,var(--accent2),var(--accent)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
@@ -152,17 +155,57 @@
     .hbtn-icon { font-size: 14px; }
 
     /* ═══ LEGEND ═══ */
-    .legend { position: absolute; bottom: 20px; left: 12px; background: rgba(10,14,26,0.93); border: 1px solid var(--border); border-radius: 10px; padding: 10px 13px; pointer-events: auto; backdrop-filter: blur(12px); }
+    .legend { position: absolute; bottom: 20px; left: 12px; background: rgba(10,14,26,0.93); border: 1px solid var(--border); border-radius: 10px; padding: 10px 13px; pointer-events: auto; backdrop-filter: blur(12px); z-index: 15; }
     .legend-title { font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text3); margin-bottom: 7px; }
     .legend-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text2); margin-bottom: 4px; }
     .ldot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
     /* ═══ GESTURE GUIDE (always hidden, shown via modal) ═══ */
-    .gesture-guide { position: absolute; bottom: 20px; right: 12px; background: rgba(10,14,26,0.93); border: 1px solid var(--border); border-radius: 10px; padding: 10px 13px; pointer-events: auto; backdrop-filter: blur(12px); display: none; }
+    /* gesture guide — old floating box, kept for compat */
+    .gesture-guide { display: none; }
+    /* NEW: gesture sidebar — vertical strip on right edge */
+    #gesture-sidebar {
+      position: fixed; right: 0; top: 50%; transform: translateY(-50%);
+      z-index: 45; display: none; flex-direction: column; align-items: center; gap: 6px;
+      background: rgba(10,14,26,0.96); border: 1px solid var(--border2);
+      border-right: none; border-radius: 12px 0 0 12px;
+      padding: 14px 10px; backdrop-filter: blur(16px);
+      box-shadow: -4px 0 24px rgba(0,0,0,0.4);
+    }
+    #gesture-sidebar.visible { display: flex; }
+    .gsb-label { font-family: var(--mono); font-size: 8px; color: var(--text3); text-transform: uppercase; letter-spacing: 1.5px; writing-mode: vertical-rl; margin-bottom: 6px; }
+    .gsb-btn {
+      width: 44px; height: 44px; border-radius: 10px; cursor: pointer;
+      background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+      transition: background 0.15s, border-color 0.15s;
+      font-size: 22px; line-height: 1;
+    }
+    .gsb-btn:hover { background: rgba(59,130,246,0.12); border-color: rgba(59,130,246,0.35); }
+    .gsb-btn:active { transform: scale(0.93); }
+    .gsb-btn-name { font-family: var(--mono); font-size: 7px; color: var(--text3); white-space: nowrap; }
+    .gsb-divider { width: 28px; height: 1px; background: var(--border); margin: 2px 0; }
+    /* gesture detail popup (appears to left of sidebar) */
+    #gesture-detail {
+      position: fixed; right: 68px; z-index: 46;
+      background: rgba(10,14,26,0.98); border: 1px solid var(--border2);
+      border-radius: 12px; padding: 14px 16px; width: 230px;
+      backdrop-filter: blur(20px); box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      display: none; pointer-events: auto;
+    }
+    #gesture-detail.visible { display: block; }
+    .gd-emoji { font-size: 38px; text-align: center; margin-bottom: 8px; }
+    .gd-title { font-family: var(--ui); font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .gd-action { font-family: var(--mono); font-size: 10px; color: var(--accent2); background: rgba(6,182,212,0.08); border: 1px solid rgba(6,182,212,0.2); border-radius: 5px; padding: 3px 8px; display: inline-block; margin-bottom: 10px; }
+    .gd-steps { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+    .gd-steps li { font-size: 12px; color: var(--text2); line-height: 1.5; display: flex; gap: 7px; }
+    .gd-steps li::before { content: '→'; color: var(--accent2); flex-shrink: 0; }
+    .gd-close { position: absolute; top: 8px; right: 10px; cursor: pointer; color: var(--text3); font-size: 16px; line-height: 1; }
+    .gd-close:hover { color: var(--text); }
     .grow { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--text2); margin-bottom: 4px; }
 
     /* ═══ WEBCAM ═══ */
-    #webcam-wrap { position: fixed; bottom: 20px; right: 12px; z-index: 50; width: 156px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border2); background: var(--surface); display: none; }
+    #webcam-wrap { position: fixed; bottom: 20px; right: 72px; z-index: 50; width: 156px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border2); background: var(--surface); display: none; }
     #webcam { width: 100%; display: block; transform: scaleX(-1); }
     #hand-canvas { position: absolute; inset: 0; width: 100%; height: 100%; transform: scaleX(-1); }
     #hand-label { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); font-family: var(--mono); font-size: 10px; color: var(--accent2); background: rgba(0,0,0,0.75); padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
@@ -388,7 +431,12 @@
 <div id="splash">
   <canvas class="splash-bg-canvas" id="splash-canvas"></canvas>
   <div class="splash-inner">
-    <div class="splash-logo-ring">⛰</div>
+    <div class="splash-logo-ring">
+      <svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="26,8 46,42 6,42" fill="url(#tri)" stroke="rgba(59,130,246,0.4)" stroke-width="1.5" stroke-linejoin="round"/>
+        <defs><linearGradient id="tri" x1="26" y1="8" x2="26" y2="42" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#60a5fa"/><stop offset="100%" stop-color="#3b82f6"/></linearGradient></defs>
+      </svg>
+    </div>
     <div class="splash-name">Repo<em>Terrain</em></div>
     <div class="splash-tagline">
       <strong>Your codebase has a shape.</strong><br>
@@ -409,8 +457,13 @@
   <canvas id="landing-bg"></canvas>
   <div class="landing-card fade-in">
     <div class="logo-wrap">
-      <div class="logo-icon">⛰</div>
-      <div class="logo-name">Repo<em>Terrain</em></div>
+      <div class="logo-icon">
+        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="10,3 18,17 2,17" fill="url(#tri2)" stroke="rgba(59,130,246,0.3)" stroke-width="0.8" stroke-linejoin="round"/>
+          <defs><linearGradient id="tri2" x1="10" y1="3" x2="10" y2="17" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#60a5fa"/><stop offset="100%" stop-color="#3b82f6"/></linearGradient></defs>
+        </svg>
+      </div>
+      <div class="logo-name">RepoTerrain</div>
     </div>
     <h1 class="hero-h1">Your codebase has a shape.<br><span class="grad">Now you can see it.</span></h1>
     <p class="hero-sub">Paste any GitLab repo. Watch it become a live 3D semantic terrain.<br>Navigate with your hands. Ask Gemini anything. Create issues in seconds.</p>
@@ -462,7 +515,7 @@
         <span class="hbtn-icon">🌋</span> Heat Map
       </div>
       <div class="hbtn" id="btn-hand" title="Hand Tracking" onclick="showInstr('hand')">
-        <span class="hbtn-icon">✋</span>
+        <span class="hbtn-icon">✋</span> Hand
       </div>
       <div class="hbtn" title="Reset Camera" onclick="resetCamera()">⌂</div>
       <div class="hbtn" title="Back" onclick="resetToLanding()">←</div>
@@ -477,13 +530,36 @@
     <div class="legend-row" style="margin-top:3px"><div class="ldot" style="background:rgba(255,255,255,0.2)"></div>File node</div>
   </div>
 
-  <div class="gesture-guide" id="gesture-guide">
-    <div class="legend-title">Hand Gestures</div>
-    <div class="grow">🖐 Open palm — <strong>fly</strong></div>
-    <div class="grow">🤏 Pinch — <strong>zoom</strong></div>
-    <div class="grow">☝️ Point — <strong>select file</strong></div>
-    <div class="grow">✊ Fist — <strong>rotate</strong></div>
+  <div class="gesture-guide" id="gesture-guide"></div>
+</div>
+
+<!-- ═══ GESTURE SIDEBAR (right edge strip) ═══ -->
+<div id="gesture-sidebar">
+  <div class="gsb-label">Gestures</div>
+  <div class="gsb-btn" onclick="showGestureDetail('palm')" title="Open Palm — Fly">
+    🖐<span class="gsb-btn-name">Fly</span>
   </div>
+  <div class="gsb-divider"></div>
+  <div class="gsb-btn" onclick="showGestureDetail('pinch')" title="Pinch — Zoom">
+    🤏<span class="gsb-btn-name">Zoom</span>
+  </div>
+  <div class="gsb-divider"></div>
+  <div class="gsb-btn" onclick="showGestureDetail('point')" title="Point Up — Select">
+    ☝️<span class="gsb-btn-name">Select</span>
+  </div>
+  <div class="gsb-divider"></div>
+  <div class="gsb-btn" onclick="showGestureDetail('fist')" title="Fist — Rotate">
+    ✊<span class="gsb-btn-name">Rotate</span>
+  </div>
+</div>
+
+<!-- ═══ GESTURE DETAIL POPUP ═══ -->
+<div id="gesture-detail">
+  <span class="gd-close" onclick="closeGestureDetail()">×</span>
+  <div class="gd-emoji" id="gd-emoji">🖐</div>
+  <div class="gd-title" id="gd-title">Open Palm</div>
+  <div class="gd-action" id="gd-action">Action: Fly / Orbit</div>
+  <ul class="gd-steps" id="gd-steps"></ul>
 </div>
 
 <!-- FILE PANEL -->
@@ -1127,35 +1203,58 @@ function appendUser(text) {
 
 /* ── format agent text ── */
 function formatAgentText(text) {
-  let lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
-  let html='',inList=false;
-  for(let i=0;i<lines.length;i++){
-    let line=lines[i];
-    const isHeader=/^[🎯🔴🔵🟡🟠✅⚠📋⚙🚀💡🗺🔥❄📌👉►→#]/.test(line)&&line.length<80;
-    const isBullet=/^[•\-\*]/.test(line)||/^\d+[\.\)]/.test(line);
-    if(isBullet){
-      if(!inList){html+='<ul class="msg-list">';inList=true;}
-      html+=`<li>${line.replace(/^[•\-\*\d\.\)]+\s*/,'').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')}</li>`;
+  // Normalize bullets: collapse consecutive list items under same section
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  let html = '';
+  let inList = false;
+  let inSection = false;
+
+  const closeList = () => { if (inList) { html += '</ul>'; inList = false; } };
+  const closeSection = () => { if (inSection) { html += '</div>'; inSection = false; } };
+
+  const HEADER_RE = /^[🎯🔴🔵🟡🟠✅⚠📋⚙🚀💡🗺🔥❄📌👉►→#]/;
+  const BULLET_RE = /^[•\-\*]|^\d+[\.\)]/;
+  const FIELD_RE  = /^\*\*(Why|Key files?|Heat|Action|Hottest|Coldest|Start here)[:\s]/i;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const isHeader = HEADER_RE.test(line) && line.length < 90;
+    const isBullet = BULLET_RE.test(line);
+    const isField  = FIELD_RE.test(line) || /^[•\-\*]\s*\*\*(Why|Key|Heat|Action)/.test(line);
+
+    if (isHeader) {
+      closeList(); closeSection();
+      // Extract emoji prefix and title text
+      const emojiMatch = line.match(/^([\p{Emoji}\p{So}]+)\s*/u);
+      const emoji = emojiMatch ? emojiMatch[1] : '';
+      const titleRaw = line.replace(/^[\p{Emoji}\p{So}]+\s*/u, '').replace(/\*\*/g,'').replace(/[:\s]+$/,'');
+      html += `<div class="msg-section">`;
+      html += `<div class="msg-section-title"><span>${emoji}</span><span>${titleRaw}</span></div>`;
+      inSection = true;
+    } else if (isBullet || isField) {
+      if (!inList) { html += '<ul class="msg-list">'; inList = true; }
+      const content = line
+        .replace(/^[•\-\*\d\.\)]+\s*/, '')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      // Detect sub-field labels like **Why:** or **Heat:**
+      const labeled = content.replace(/^<strong>([^<]+)<\/strong>[:]\s*/, (_, lbl) =>
+        `<span style="color:var(--accent2);font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.8px;margin-right:5px">${lbl}</span>`
+      );
+      html += `<li>${labeled}</li>`;
     } else {
-      if(inList){html+='</ul>';inList=false;}
-      if(isHeader){
-        const em=line.match(/^[^\w\s]*/)?.[0]||'';
-        const tt=line.replace(/^[^\w\s]*\s*/,'').replace(/[:\s]+$/,'');
-        html+=`<div class="msg-section"><div class="msg-section-title">${em} ${tt}</div>`;
-        let sc='';
-        while(i+1<lines.length&&!/^[🎯🔴🔵🟡🟠✅⚠📋⚙🚀💡🗺🔥❄📌👉►→#]/.test(lines[i+1])){
-          i++;const nx=lines[i];
-          if(/^[•\-\*]/.test(nx)||/^\d+[\.\)]/.test(nx)){sc+=`<ul class="msg-list"><li>${nx.replace(/^[•\-\*\d\.\)]+\s*/,'').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')}</li></ul>`;}
-          else{sc+=`<p>${nx.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')}</p>`;}
-        }
-        html+=sc+'</div>';
-      } else {
-        html+=`<p>${line.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')}</p>`;
+      closeList();
+      if (!inSection && line.length > 0) {
+        html += `<p>${line.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')}</p>`;
+      } else if (inSection) {
+        html += `<p>${line.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')}</p>`;
       }
     }
   }
-  if(inList)html+='</ul>';
-  return html||`<p>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}</p>`;
+
+  closeList();
+  closeSection();
+
+  return html || `<p>${text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}</p>`;
 }
 
 function appendAgent(text,actions) {
@@ -1185,11 +1284,30 @@ function getDemoResponse(query,file){
   return`🗺 **Terrain Overview**\n\n**${terrainNodes.length} files** mapped across semantic clusters.\n\n• Files are positioned by code similarity — related code clusters together\n• Heat shows recent activity patterns across the codebase\n• Click any file card to select it and ask Gemini about it specifically`;
 }
 
+/* ═══ GESTURE SIDEBAR ═══ */
+const GESTURE_INFO = {
+  palm:  { emoji:'🖐', title:'Open Palm — Fly & Orbit', action:'Camera fly mode', steps:['Hold hand open flat, all fingers spread wide','Move hand LEFT/RIGHT to orbit around terrain','Move hand UP/DOWN to tilt camera angle','Keep palm facing camera for best detection'] },
+  pinch: { emoji:'🤏', title:'Pinch — Zoom In/Out', action:'Zoom camera', steps:['Bring thumb + index finger close together to zoom IN','Spread them apart to zoom OUT','Use Victory ✌ gesture — two fingers spread = zoom distance','Slower movement = finer zoom control'] },
+  point: { emoji:'☝️', title:'Point Up — Select File', action:'Select file card', steps:['Extend only your INDEX finger pointing upward','Aim fingertip at a floating file card','Raycaster hits nearest card to your pointer','File details panel opens automatically on right'] },
+  fist:  { emoji:'✊', title:'Closed Fist — Rotate', action:'Grab and rotate', steps:['Close all fingers into a tight fist','Move hand left/right to rotate terrain horizontally','Works like a grab-rotate interaction','Open hand to switch back to fly mode'] },
+};
+function showGestureDetail(type) {
+  const info = GESTURE_INFO[type]; if(!info) return;
+  document.getElementById('gd-emoji').textContent = info.emoji;
+  document.getElementById('gd-title').textContent = info.title;
+  document.getElementById('gd-action').textContent = 'Action: '+info.action;
+  document.getElementById('gd-steps').innerHTML = info.steps.map(s=>`<li>${s}</li>`).join('');
+  const detail = document.getElementById('gesture-detail');
+  detail.style.top='50%'; detail.style.transform='translateY(-50%)';
+  detail.classList.add('visible');
+}
+function closeGestureDetail() { document.getElementById('gesture-detail').classList.remove('visible'); }
+
 /* ═══ HAND TRACKING ═══ */
 async function toggleHandTracking() {
-  const btn=document.getElementById('btn-hand'),wrap=document.getElementById('webcam-wrap'),guide=document.getElementById('gesture-guide');
-  if(handTrackingActive){handTrackingActive=false;btn.classList.remove('on');wrap.style.display='none';guide.style.display='none';return;}
-  handTrackingActive=true;btn.classList.add('on');wrap.style.display='block';guide.style.display='block';
+  const btn=document.getElementById('btn-hand'),wrap=document.getElementById('webcam-wrap'),sidebar=document.getElementById('gesture-sidebar');
+  if(handTrackingActive){handTrackingActive=false;btn.classList.remove('on');wrap.style.display='none';sidebar.classList.remove('visible');closeGestureDetail();return;}
+  handTrackingActive=true;btn.classList.add('on');wrap.style.display='block';sidebar.classList.add('visible');
   try {
     const stream=await navigator.mediaDevices.getUserMedia({video:true});
     const video=document.getElementById('webcam'); video.srcObject=stream; await video.play();
@@ -1204,7 +1322,7 @@ async function toggleHandTracking() {
       hc.width=video.videoWidth;hc.height=video.videoHeight;
       const res=recognizer.recognizeForVideo(video,performance.now());
       ctx.clearRect(0,0,hc.width,hc.height);
-      if(res.gestures.length>0){const g=res.gestures[0][0].categoryName,lm=res.landmarks[0];handleGesture(g,lm);document.getElementById('hand-label').textContent={Open_Palm:'🖐 Fly',Closed_Fist:'✊ Rotate',Pointing_Up:'☝ Select',Victory:'✌ Zoom'}[g]||`✋ ${g}`;}
+      if(res.gestures.length>0){const g=res.gestures[0][0].categoryName,lm=res.landmarks[0];handleGesture(g,lm);document.getElementById('hand-label').textContent={Open_Palm:'🖐 Flying',Closed_Fist:'✊ Rotating',Pointing_Up:'☝ Selecting',Victory:'✌ Zooming'}[g]||`✋ ${g}`;}
       else{document.getElementById('hand-label').textContent='✋ detecting…';}
       requestAnimationFrame(detectFrame);
     }
@@ -1229,7 +1347,10 @@ function resetToLanding(){
   document.getElementById('progress-area').style.display='none';
   document.getElementById('ingest-btn').disabled=false;
   document.getElementById('btn-text').textContent='Map Terrain';
+  document.getElementById('gesture-sidebar').classList.remove('visible');
+  closeGestureDetail();
   if(wsConn){wsConn.close();wsConn=null;}
+  handTrackingActive=false;
   initLandingBg(); generateDefaultHeat();
 }
 
