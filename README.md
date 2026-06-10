@@ -15,7 +15,7 @@
 
 <br/>
 
-> **Google Cloud Rapid Agent Hackathon — GitLab Track — June 2026**
+ **Google Cloud Rapid Agent Hackathon — GitLab Track — June 2026**
 > Transform any GitLab repository into a navigable 3D semantic terrain. Files float as cards positioned by AI similarity. A Gemini agent analyzes the codebase and creates real GitLab issues via MCP — all navigable with bare hands.
 
 <p>
@@ -28,9 +28,7 @@
   <a href="https://github.com/ashish-doing/repoterrain/blob/main/ARCHITECTURE.md">
     <img src="https://img.shields.io/badge/%F0%9F%93%90%20Architecture-deep%20dive-6B4FFF?style=for-the-badge" />
   </a>
-  <a href="https://github.com/ashish-doing/repoterrain">
-    <img src="https://img.shields.io/badge/GitHub-ashish--doing%2Frepoterrain-181717?style=for-the-badge&logo=github" />
-  </a>
+  
 </p>
 
 <br/>
@@ -65,6 +63,20 @@ Paste any public GitLab repository URL. In ~15 seconds:
 Tested on gitlab-org/gitlab-runner → 149 files · multiple semantic clusters · ~15s end-to-end
 ```
 
+---
+
+## Screenshots
+ 
+| | |
+|---|---|
+| ![Landing page](./screenshots/landing.png) | ![3D terrain with agent](./screenshots/terrain-agent.png) |
+| **Landing page** — paste any GitLab repo URL to begin | **3D semantic terrain + Gemini agent** — agent reads the terrain and creates a real GitLab issue live |
+| ![Heat map](./screenshots/heatmap.png) | ![Hand tracking](./screenshots/hand-tracking.png) |
+| **Activity heat map** — hottest files, cluster map, and cold zones at a glance | **MediaPipe hand tracking** — navigate the terrain with gestures, no mouse needed |
+ 
+![GitLab issue created](./screenshots/gitlab-issue.png)
+**Live GitLab issue** — created by the agent, not simulated, viewable on `ashish-doing/repoterrain-demo`
+ 
 ---
 
 ## Agent in Action
