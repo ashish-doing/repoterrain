@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://readme-typing-svg.demolab.com?font=Orbitron&weight=900&size=28&duration=3000&pause=1000&color=00E5FF&center=true&vCenter=true&width=800&lines=RepoTerrain+%E2%80%94+3D+Codebase+Intelligence;Google+Cloud+Rapid+Agent+Hackathon+%E2%80%94+GitLab+Track" alt="RepoTerrain" />
+<img src="https://readme-typing-svg.demolab.com?font=Orbitron&weight=900&size=24&duration=3000&pause=1000&color=00E5FF&center=true&vCenter=true&width=900&lines=RepoTerrain+%E2%80%94+3D+Codebase+Intelligence;Google+Cloud+Rapid+Agent+Hackathon+%E2%80%94+GitLab+Track" alt="RepoTerrain" />
 
 <br/>
 
@@ -46,7 +46,7 @@
 
 ▶ **[Watch the demo on YouTube](https://youtu.be/VIDEO_ID)**
 
-> 3-minute walkthrough: terrain load → agent Q&A → live GitLab issue creation
+> 3-minute walkthrough: terrain load → hand-gesture navigation → agent Q&A → live GitLab issue creation
 
 ---
 
@@ -55,13 +55,14 @@
 Paste any public GitLab repository URL. In ~15 seconds:
 
 - **Up to 150 files** are fetched, embedded with Google AI, and projected into 3D space via UMAP
-- **Semantic clusters** emerge — files grouped by code similarity, not folder structure
-- **Activity heat map** shows which code is active (red) vs legacy (blue)
-- **Gemini 2.0 Flash agent** answers questions with real file content as context
-- **GitLab MCP actions** create real issues, list MRs, and fetch pipeline status — live
+- **Semantic clusters** emerge — files grouped by directory and language proximity, not just raw folder structure
+- **Activity heat map** scores each file 0–1 from filename role, size, and tree depth — red = core/active, blue = legacy/docs
+- **Gemini 2.0 Flash agent** answers questions with real file content and live terrain stats as context
+- **GitLab MCP actions** create real issues, list open MRs, and fetch pipeline status — live, on the actual repo
+- **MediaPipe hand tracking** lets you fly, orbit, zoom, and select files with gestures — open palm to fly, pinch to zoom, point to select
 
 ```
-Tested on gitlab-org/gitlab-runner → 149 files · 24 clusters · ~15s end-to-end
+Tested on gitlab-org/gitlab-runner → 149 files · multiple semantic clusters · ~15s end-to-end
 ```
 
 ---
@@ -70,10 +71,13 @@ Tested on gitlab-org/gitlab-runner → 149 files · 24 clusters · ~15s end-to-e
 
 | Query | What Happens |
 |---|---|
-| `"What's the most complex module?"` | Gemini reads file content → structured analysis with cluster context |
-| `"Create an issue for cold zones"` | Real GitLab issue created at `ashish-doing/repoterrain-demo` with labels + clickable URL in chat |
-| `"Explain the CI cluster"` | Reads actual CI files, explains module relationships |
-| `"List open MRs"` | Fetches live merge requests via GitLab API |
+| `"What's the most complex module?"` | Gemini reads terrain stats + real file content → structured analysis citing actual filenames |
+| `"Create an issue for cold zones"` | Real GitLab issue created on `ashish-doing/repoterrain-demo` with labels + clickable URL returned in chat |
+| `"Explain the CI cluster"` | Reads actual files in the selected cluster, explains how they relate |
+| `"List open MRs"` | Fetches live merge requests via the GitLab REST API |
+| `"Get pipeline status"` | Fetches recent pipeline runs and their status |
+
+The agent's response format is fixed (module name, why it matters, key files, heat level, next action), so every answer stays grounded in the terrain that's actually on screen — no invented file paths.
 
 ---
 
@@ -83,27 +87,27 @@ Tested on gitlab-org/gitlab-runner → 149 files · 24 clusters · ~15s end-to-e
 |---|---|---|
 | **AI Embeddings** | Google AI `text-embedding-004` | 768-dim semantic file vectors |
 | **AI Agent** | Gemini 2.0 Flash | Codebase Q&A + action reasoning |
-| **Fallback LLM** | Groq LLaMA 3.1 8B | Agent fallback when Gemini quota exceeded |
-| **Fallback Embed** | TF-IDF (sklearn) | Embedding fallback (~2.8s vs ~15s Gemini) |
-| **3D Engine** | Three.js r128 + CSS3DRenderer | Floating file cards in semantic space |
+| **Fallback LLM** | Groq `llama-3.1-8b-instant` | Agent fallback when Gemini is unavailable or quota exceeded |
+| **Fallback Embed** | TF-IDF + sklearn | Embedding fallback when no Gemini key is set |
+| **Dim Reduction** | UMAP (cosine, 3 components) | High-dim vectors → 3D coordinates |
+| **3D Engine** | Three.js + CSS3DRenderer | Floating file cards in semantic space |
 | **Hand Tracking** | MediaPipe Tasks Vision | Gesture-based terrain navigation |
-| **Dim Reduction** | UMAP | High-dim vectors → 3D coordinates |
-| **GitLab Actions** | GitLab REST API v4 | Issue creation, MR listing, pipelines |
-| **Backend** | FastAPI + uvicorn | Ingest pipeline + agent API + WebSocket |
-| **Deployment** | Railway | Live public URL |
+| **GitLab Actions** | GitLab REST API v4 | Issue creation, MR listing, pipeline status |
+| **Backend** | FastAPI + uvicorn + WebSockets | Ingest pipeline, agent API, real-time updates |
+| **Deployment** | Railway (Nixpacks) | Live public URL |
 
 ---
 
 ## Architecture
 
-See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full system diagram with data flow, state schema, and component breakdown.
+See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full system diagram, request/response flow, and component breakdown.
 
 **Short version:**
 
 ```
-GitLab REST API → Google AI Embeddings → UMAP 3D → Three.js terrain
-                                                  ↓
-                              Gemini 2.0 Flash agent + GitLab MCP actions
+GitLab REST API v4 → Gemini Embeddings (or TF-IDF fallback) → UMAP 3D → Three.js terrain
+                                                                      |
+                                  Gemini 2.0 Flash agent (or Groq fallback) + GitLab MCP actions
 ```
 
 ---
@@ -112,25 +116,12 @@ GitLab REST API → Google AI Embeddings → UMAP 3D → Three.js terrain
 
 | Requirement | Status |
 |---|---|
-| Google Cloud AI (Gemini) | ✅ Gemini 2.0 Flash — agent reasoning |
-| Google Cloud AI (Embeddings) | ✅ `text-embedding-004` — semantic file positioning |
-| GitLab MCP actions | ✅ Real issue creation, MR listing, pipeline fetch |
-| Agent takes real actions | ✅ Creates artifacts on GitLab, not just chat responses |
-| New project | ✅ First commit May 23, 2026 (hackathon opened May 5) |
-| Public repo + live demo | ✅ MIT license, deployed on Railway |
-
----
-
-## Performance
-
-| Metric | Value |
-|---|---|
-| Files analyzed | Up to 150 per repo |
-| Embedding (TF-IDF fallback) | ~2.8 seconds |
-| Embedding (Google AI) | ~15 seconds (768-dim vectors) |
-| End-to-end terrain load | ~15 seconds |
-| Agent response | ~2s (Groq) / ~3s (Gemini) |
-| Issue creation | ~1 second |
+| Google Cloud AI (Gemini agent) | Done — Gemini 2.0 Flash for codebase Q&A and action reasoning |
+| Google Cloud AI (embeddings) | Done — `text-embedding-004` for semantic file positioning |
+| GitLab MCP actions | Done — real issue creation, MR listing, pipeline status via GitLab REST API v4 |
+| Agent takes real actions | Done — creates artifacts on GitLab, not just chat responses |
+| New project | Done — first commit May 23, 2026 (hackathon opened May 5, 2026) |
+| Public repo + live demo | Done — MIT license, deployed on Railway |
 
 ---
 
@@ -141,22 +132,23 @@ git clone https://github.com/ashish-doing/repoterrain
 cd repoterrain/backend
 pip install -r requirements.txt
 
-# Create .env
+# Create a .env file in backend/
 GEMINI_API_KEY=your_key_here
 GROQ_API_KEY=your_key_here
 GITLAB_TOKEN=your_token_here
 
 uvicorn main:app --reload --port 8080
-# Open: http://localhost:8080/app
+# Landing page: http://localhost:8080/
+# App:          http://localhost:8080/app
 ```
 
 ### Environment Variables
 
-| Variable | Purpose | Required |
+| Variable | Purpose | Effect if Missing |
 |---|---|---|
-| `GEMINI_API_KEY` | Gemini 2.0 Flash + text-embedding-004 | Recommended |
-| `GROQ_API_KEY` | LLaMA 3.1 fallback | Recommended |
-| `GITLAB_TOKEN` | Issue creation + MR/pipeline fetch | For MCP actions |
+| `GEMINI_API_KEY` | Gemini 2.0 Flash agent + `text-embedding-004` embeddings | Falls back to TF-IDF embeddings and Groq agent |
+| `GROQ_API_KEY` | `llama-3.1-8b-instant` agent fallback | Agent falls back to demo-mode responses |
+| `GITLAB_TOKEN` | Issue creation, MR/pipeline fetch, private repo access | MCP actions disabled; public repos still ingestible |
 
 ---
 
@@ -165,13 +157,17 @@ uvicorn main:app --reload --port 8080
 ```
 repoterrain/
 ├── backend/
-│   ├── main.py          FastAPI — /ingest, /agent/query, /ws, /app, /
-│   ├── pipeline.py      GitLab fetch → embed → UMAP → terrain JSON
-│   ├── agent.py         Gemini 2.0 Flash + Groq fallback + GitLab MCP
-│   ├── index.html       Frontend (Three.js + MediaPipe + agent panel)
-│   ├── landing.html     Product landing page
+│   ├── main.py            FastAPI app — /, /app, /ingest, /agent/query, /ws/{session_id}, /terrain/{id}, /health
+│   ├── pipeline.py        GitLab fetch -> embed -> UMAP -> cluster/heat -> terrain JSON
+│   ├── agent.py           Gemini 2.0 Flash + Groq fallback + GitLab MCP actions
+│   ├── index.html         Frontend - Three.js terrain + MediaPipe hand tracking + agent panel
+│   ├── landing.html       Product landing page (served at /)
 │   └── requirements.txt
+├── docs/
+│   └── index.html         GitHub Pages mirror of the landing page
 ├── ARCHITECTURE.md
+├── deploy.sh               Cloud Run deployment script
+├── nixpacks.toml           Railway build/start config
 └── README.md
 ```
 

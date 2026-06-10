@@ -2,120 +2,134 @@
 
 ## Overview
 
-RepoTerrain has two phases: an **ingest pipeline** that transforms a GitLab repository into a 3D semantic terrain, and an **agent loop** that lets Gemini 2.0 Flash answer questions and take real actions on that terrain.
+RepoTerrain has two phases: an **ingest pipeline** that turns a GitLab repository into a 3D semantic terrain, and an **agent loop** that lets Gemini 2.0 Flash answer questions about that terrain and take real actions on GitLab via MCP-style REST calls.
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                        INGEST PIPELINE                           │
-│                                                                  │
-│  POST /ingest  {"repo_url": "gitlab.com/org/repo"}               │
-│                                                                  │
-│  1. fetch_repo_files()                                           │
-│     └── GitLab REST API v4                                       │
-│         → file tree (recursive) + raw content                    │
-│         → up to 150 files per repo                               │
-│                                                                  │
-│  2. embed_files()                                                │
-│     ├── embed_gemini()  ← Google AI text-embedding-004           │
-│     │   → 768-dimensional semantic vectors per file              │
-│     └── embed_tfidf()   ← sklearn fallback (~2.8s)               │
-│         → TF-IDF sparse vectors, SVD-reduced                     │
-│                                                                  │
-│  3. project_to_3d()                                              │
-│     └── UMAP (n_components=3, metric=cosine)                     │
-│         → (x, y, z) coordinates per file                        │
-│         → files with similar code land near each other           │
-│                                                                  │
-│  4. cluster_files()                                              │
-│     └── HDBSCAN / KMeans                                         │
-│         → semantic cluster labels (CI, CORE, DOCS, CACHE …)     │
-│                                                                  │
-│  5. compute_heat()                                               │
-│     └── GitLab commit frequency per file                         │
-│         → heat score 0–100 (red = hot, blue = cold)             │
-│                                                                  │
-│  Response: nodes[], edges[], clusters[], metadata                │
-└──────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                      THREE.JS FRONTEND                           │
-│                                                                  │
-│  CSS3DRenderer                                                   │
-│  ├── Floating file cards  (filename · language · heat bar)       │
-│  ├── Cluster label billboards  (CI · CORE · DOCS · CACHE …)     │
-│  ├── Edge lines  (semantic connections between files)            │
-│  └── Particle background                                         │
-│                                                                  │
-│  Camera controls                                                 │
-│  ├── Orbit / zoom / pan  (mouse + touch)                         │
-│  └── flyTo(node)  (click any card → camera animates to it)       │
-│                                                                  │
-│  MediaPipe Hand Tracking                                         │
-│  ├── Open Palm  → camera fly mode                                │
-│  ├── Pinch      → zoom                                           │
-│  └── Point      → file select + trigger agent query             │
-└──────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                        AGENT LOOP                                │
-│                                                                  │
-│  POST /agent/query                                               │
-│  {"message": "...", "history": [...], "terrain_data": {...}}     │
-│                                                                  │
-│  call_gemini(message, history, repo_url)                         │
-│  ├── System prompt: terrain context + cluster summary            │
-│  ├── File content injected per relevant cluster                  │
-│  ├── Conversation history (last 16 turns)                        │
-│  └── Tool detection: does response contain an action?            │
-│      │                                                           │
-│      ▼  if action detected                                       │
-│  execute_gitlab_actions(actions, repo_url)                       │
-│  ├── gitlab_create_issue()  → POST /projects/:id/issues          │
-│  ├── gitlab_list_mrs()      → GET /projects/:id/merge_requests   │
-│  └── gitlab_get_pipelines() → GET /projects/:id/pipelines        │
-│                                                                  │
-│  Fallback: call_groq()  (LLaMA 3.1 8B)                          │
-│  └── triggers when Gemini quota exceeded                         │
-│                                                                  │
-│  WS /ws/{session_id}  → real-time streaming updates             │
-└──────────────────────────────────────────────────────────────────┘
+---
+
+## System Diagram
+
+```mermaid
+flowchart TD
+    subgraph CLIENT["🖥️ FRONTEND — index.html"]
+        UI["Three.js + CSS3DRenderer\n━━━━━━━━━━━━━━━\n• floating file cards\n• heat-colored terrain\n• edge lines between similar files"]
+        HAND["MediaPipe Hand Tracking\n━━━━━━━━━━━━━━━\n• open palm → fly/orbit\n• pinch → zoom\n• point → select file"]
+        PANEL["Agent Panel\n━━━━━━━━━━━━━━━\n• chat with Gemini\n• selected file / cluster context\n• action results (issue links, MRs)"]
+        HAND -->|controls| UI
+        UI -->|select node| PANEL
+    end
+
+    subgraph API["⚙️ BACKEND — main.py (FastAPI)"]
+        ING["POST /ingest\n━━━━━━━━━━━━━━━\nrepo_url, gitlab_token,\nmax_files"]
+        AGT["POST /agent/query\n━━━━━━━━━━━━━━━\nsession_id, query,\nselected_file, selected_cluster"]
+        WS["WS /ws/{session_id}\n━━━━━━━━━━━━━━━\nreal-time agent responses"]
+        CACHE["terrain_cache\n━━━━━━━━━━━━━━━\nin-memory session store"]
+        ING --> CACHE
+        AGT --> CACHE
+        WS --> CACHE
+    end
+
+    subgraph PIPE["🛰️ pipeline.py"]
+        FETCH["fetch_repo_files()\n━━━━━━━━━━━━━━━\nGitLab REST API v4\nfile tree + raw content\nup to 150 files"]
+        EMBED["embed_files()\n━━━━━━━━━━━━━━━\nGemini text-embedding-004\nor TF-IDF fallback"]
+        UMAPB["project_to_3d()\n━━━━━━━━━━━━━━━\nUMAP, 3 components,\ncosine metric"]
+        META["compute_metadata()\n━━━━━━━━━━━━━━━\nheat score, language,\nclusters, edges"]
+        FETCH --> EMBED --> UMAPB --> META
+    end
+
+    subgraph AGENT["🤖 agent.py"]
+        CTX["build_context()\n━━━━━━━━━━━━━━━\nterrain stats + file content\n+ selected cluster"]
+        GEM["call_gemini()\n━━━━━━━━━━━━━━━\nGemini 2.0 Flash\nsystem prompt + history"]
+        GROQ["call_groq()\n━━━━━━━━━━━━━━━\nllama-3.1-8b-instant\nfallback model"]
+        ACT["execute_gitlab_actions()\n━━━━━━━━━━━━━━━\ncreate_issue · list_mrs\nget_pipelines"]
+        CTX --> GEM
+        GEM -->|quota / error| GROQ
+        GEM --> ACT
+        GROQ --> ACT
+    end
+
+    subgraph GITLAB["🦊 GITLAB PLATFORM"]
+        REPO["Target Repo\n━━━━━━━━━━━━━━━\nrepository/tree\nrepository/files/*/raw"]
+        DEMO["ashish-doing/repoterrain-demo\n━━━━━━━━━━━━━━━\nissues created here"]
+        MRAPI["merge_requests\npipelines API"]
+    end
+
+    UI -->|paste repo URL| ING
+    PANEL -->|ask question| AGT
+    PANEL -->|gesture select| WS
+
+    ING --> FETCH
+    META -->|nodes, edges, meta| ING
+    ING -->|terrain JSON| UI
+
+    AGT --> CTX
+    ACT -->|create issue| DEMO
+    ACT -->|list MRs / pipelines| MRAPI
+    FETCH -->|tree + files| REPO
+
+    GEM -->|response + actions| AGT
+    AGT -->|text, actions, model| PANEL
 ```
 
 ---
 
-## Data Flow (single request)
+## Request Flow — Ingest
 
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI as Frontend (index.html)
+    participant API as FastAPI (main.py)
+    participant PL as pipeline.py
+    participant GL as GitLab API v4
+    participant G as Gemini Embeddings
+
+    User->>UI: Paste GitLab repo URL
+    UI->>API: POST /ingest {repo_url, max_files}
+    API->>PL: run_pipeline()
+    PL->>GL: GET /projects/:id (default branch)
+    PL->>GL: GET /repository/tree (paginated, recursive)
+    PL->>GL: GET /repository/files/*/raw (batches of 10)
+    GL-->>PL: file contents (up to 150 files)
+    PL->>G: embedContent (text-embedding-004) per file
+    G-->>PL: 768-dim vectors (or TF-IDF fallback if no key)
+    PL->>PL: UMAP -> 3D coords (cosine, n_components=3)
+    PL->>PL: compute heat, language, clusters, edges
+    PL-->>API: {session_id, nodes, edges, meta, files}
+    API-->>UI: {session_id, nodes, edges, meta}
+    UI->>UI: render CSS3D terrain
 ```
-User pastes: gitlab.com/gitlab-org/gitlab-runner
-          │
-          ▼
-Backend fetches file tree via GitLab API v4
-          │
-          ▼
-Each file content → Google AI text-embedding-004
-          │         (768-dim vector per file)
-          ▼
-UMAP reduces 768-dim → 3-dim (x, y, z)
-          │
-          ▼
-HDBSCAN clusters files by semantic proximity
-          │
-          ▼
-Frontend renders CSS3D cards at computed positions
-          │
-          ▼
-User asks: "Create an issue for cold zones"
-          │
-          ▼
-Gemini 2.0 Flash reads terrain + file content
-          │
-          ▼
-Action detected → GitLab API creates real issue
-          │
-          ▼
-Chat panel shows clickable issue URL
+
+---
+
+## Request Flow — Agent Query
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI as Frontend (index.html)
+    participant API as FastAPI (main.py)
+    participant AG as agent.py
+    participant Gemini as Gemini 2.0 Flash
+    participant Groq as Groq Llama 3.1
+    participant GL as GitLab API v4
+
+    User->>UI: "Create an issue for cold zones"
+    UI->>API: POST /agent/query {session_id, query}
+    API->>AG: agent_query(query, terrain_data)
+    AG->>AG: classify_intent() -> "create_issue"
+    AG->>AG: build_context() + build_message()
+    AG->>Gemini: generateContent (system prompt + history)
+    alt Gemini unavailable / quota error
+        AG->>Groq: chat/completions (llama-3.1-8b-instant)
+        Groq-->>AG: response text
+    else Gemini OK
+        Gemini-->>AG: response text
+    end
+    AG->>GL: POST /projects/:id/issues (title, description, labels)
+    GL-->>AG: {web_url, iid, title}
+    AG-->>API: {text, actions, model, reasoning}
+    API-->>UI: agent response
+    UI->>UI: render reply + clickable issue link
 ```
 
 ---
@@ -124,67 +138,90 @@ Chat panel shows clickable issue URL
 
 | File | Responsibility |
 |---|---|
-| `backend/main.py` | FastAPI app — route definitions, WebSocket handler, static serving |
-| `backend/pipeline.py` | Full ingest pipeline: GitLab fetch → embed → UMAP → cluster → heat |
-| `backend/agent.py` | Gemini + Groq agent loop, GitLab MCP action execution |
-| `backend/index.html` | Single-file frontend: Three.js terrain + MediaPipe + agent panel |
-| `backend/landing.html` | Product landing page at `/` |
+| `backend/main.py` | FastAPI app — `/`, `/app`, `/health`, `/ingest`, `/agent/query`, `/ws/{session_id}`, `/terrain/{session_id}` |
+| `backend/pipeline.py` | GitLab fetch -> embed -> UMAP -> heat/language/cluster/edge computation -> terrain JSON |
+| `backend/agent.py` | Intent classification, context building, Gemini/Groq calls, GitLab MCP action execution |
+| `backend/index.html` | Single-file frontend — Three.js terrain, MediaPipe hand tracking, agent chat panel |
+| `backend/landing.html` | Product landing page served at `/` |
+| `docs/index.html` | GitHub Pages mirror of the landing page |
 
 ---
 
 ## Embedding Strategy
 
-Two embedding paths run in priority order:
-
-```
-1. Google AI text-embedding-004  (primary)
-   → 768-dim dense vectors
-   → semantic similarity captures code intent, not just keywords
-   → ~15s for 150 files
-
-2. TF-IDF + SVD  (fallback)
-   → sparse term-frequency vectors, truncated SVD to 50 dims
-   → ~2.8s for 150 files
-   → activates when GEMINI_API_KEY is absent or quota exceeded
+```mermaid
+flowchart LR
+    A["files dict\n{path: content[:2000]}"] --> B{"GEMINI_API_KEY set?"}
+    B -->|yes| C["embed_gemini()\n━━━━━━━━━━━━━━━\ntext-embedding-004\n768-dim per file\nbatched, 0.5s pause / 10 files"]
+    B -->|no| D["embed_tfidf()\n━━━━━━━━━━━━━━━\nTfidfVectorizer\nmax_features=384\nstop_words=english"]
+    C --> E["UMAP(n_components=3,\nmetric=cosine,\nn_neighbors=min(15,n-1))"]
+    D --> E
+    E --> F["normalized x,y,z in [-1, 1]"]
 ```
 
-The UMAP projection uses cosine distance in both cases, so cluster shapes are comparable across both embedding paths.
+If a Gemini embed call fails for a single file, `pipeline.py` substitutes a random 768-dim vector for that file rather than failing the whole batch — so one bad file never blocks terrain generation.
+
+---
+
+## Heat & Cluster Computation
+
+`compute_metadata()` derives, per file:
+
+- **`heat`** (0.05–1.0) — base 0.2, boosted for filenames matching core/entry patterns (`main`, `index`, `app`, `server`, `router`, `config`, `auth`, `core`, `client`, `engine`, ...), reduced for `test`, `spec`, `mock`, `readme`, `changelog`, etc., plus a contribution from file size and tree depth (shallower files run hotter).
+- **`language`** — derived from file extension via a fixed extension map.
+- **`size`** — `min(content_length / 5000, 1.0)`.
+
+`compute_clusters()` groups files by parent directory name (falling back to language when a file is at the root), discarding clusters with fewer than 2 members.
+
+`compute_edges()` connects each node to its 3 nearest neighbours in 3D space, capped at `max_dist = 0.35`, giving the terrain its semantic-connection lines.
 
 ---
 
 ## GitLab MCP Actions
 
-The agent executes real GitLab operations via the REST API v4. These are not simulated — issues created appear on the actual repository.
+The agent executes real GitLab operations via the REST API v4 — these are not simulated; issues created appear on the live repository.
 
 ```python
 # Issue creation (simplified)
 POST https://gitlab.com/api/v4/projects/{project_path}/issues
 {
   "title": "...",
-  "description": "...",
-  "labels": "terrain,cold-zone"
+  "description": "🤖 Created by RepoTerrain AI Agent\n\n...",
+  "labels": "repoterrain"  # or tech-debt/low-priority, needs-review/high-priority
 }
 # Returns: { "web_url": "https://gitlab.com/ashish-doing/repoterrain-demo/-/issues/N" }
 ```
 
-Actions supported:
-- `create_issue` — creates labeled issue on `ashish-doing/repoterrain-demo`
-- `list_mrs` — fetches open merge requests on the analyzed repo
-- `get_pipelines` — fetches recent pipeline runs and status
+| Intent (from `classify_intent`) | Action | Endpoint |
+|---|---|---|
+| `create_issue` | `gitlab_create_issue()` | `POST /projects/ashish-doing%2Frepoterrain-demo/issues` |
+| `list_mrs` | `gitlab_list_mrs()` | `GET /merge_requests?state=opened&per_page=5` |
+| `get_pipelines` | `gitlab_get_pipelines()` | `GET /projects/:id/pipelines?per_page=5` |
+
+Issue titles are extracted from the agent's first non-bullet response line; labels are chosen from the query keywords (`cold`/`legacy` -> `tech-debt, low-priority`, `hot`/`complex` -> `needs-review, high-priority`, otherwise `repoterrain`).
 
 ---
 
-## Fallback Chain
+## Agent Fallback Chain
 
-```
-Gemini API key present?
-  ├── YES → embed_gemini() → call_gemini()
-  │           quota hit?
-  │             └── YES → call_groq() (LLaMA 3.1 8B)
-  └── NO  → embed_tfidf() → call_groq()
+```mermaid
+flowchart TD
+    Q["User query"] --> I["classify_intent()"]
+    I --> K{"GEMINI_API_KEY set?"}
+    K -->|yes| GM["call_gemini()\ngemini-2.0-flash"]
+    K -->|no, GROQ_API_KEY set| GR["call_groq()\nllama-3.1-8b-instant"]
+    K -->|no keys| DM["demo_response()\nrule-based, terrain stats only"]
+    GM -->|empty response / API error| GR2{"GROQ_API_KEY set?"}
+    GR2 -->|yes| GR
+    GR2 -->|no| ERR["return error message"]
+    GM --> OUT["execute_gitlab_actions()"]
+    GR --> OUT
+    DM --> OUT2["actions = []"]
+    OUT --> RESP["{text, actions, model, reasoning}"]
+    OUT2 --> RESP
 ```
 
-The UI always shows `gemini-2.0-flash` as the agent model label. When Groq is actually serving the response, the underlying reasoning quality is similar for codebase Q&A tasks.
+Each session keeps its last 16 conversation turns (`history[-16:]`) so follow-up questions retain context across both Gemini and Groq calls.
 
 ---
 
@@ -192,20 +229,27 @@ The UI always shows `gemini-2.0-flash` as the agent model label. When Groq is ac
 
 | Variable | Used In | Effect if Missing |
 |---|---|---|
-| `GEMINI_API_KEY` | `pipeline.py`, `agent.py` | Falls back to TF-IDF + Groq |
-| `GROQ_API_KEY` | `agent.py` | Agent responses disabled |
-| `GITLAB_TOKEN` | `agent.py`, `pipeline.py` | MCP actions disabled; public repos still ingestible |
+| `GEMINI_API_KEY` | `pipeline.py` (embeddings), `agent.py` (chat) | Falls back to TF-IDF embeddings and Groq/demo agent |
+| `GROQ_API_KEY` | `agent.py` | Agent falls back to rule-based `demo_response()` |
+| `GITLAB_TOKEN` | `agent.py`, `pipeline.py` | GitLab MCP actions disabled; private repos inaccessible; public repos still ingestible |
 
 ---
 
 ## Deployment
 
-Hosted on Railway. The `backend/` directory is the root — Railway detects `requirements.txt` and runs:
+Hosted on Railway via `nixpacks.toml`:
 
-```
-uvicorn main:app --host 0.0.0.0 --port $PORT
+```toml
+[phases.setup]
+nixPkgs = ["python310", "gcc"]
+
+[phases.install]
+cmds = ["pip install -r backend/requirements.txt"]
+
+[start]
+cmd = "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
 ```
 
-Static files (`index.html`, `landing.html`) are served directly by FastAPI via `StaticFiles` mount. No separate frontend build step.
+`landing.html` and `index.html` are served directly by FastAPI (`/` and `/app`) — no separate frontend build step. `deploy.sh` provides an alternative Cloud Run deployment path using Docker + `gcloud run deploy`.
 
 Live URL: `https://repoterrain-production.up.railway.app`
