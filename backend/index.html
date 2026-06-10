@@ -6,10 +6,21 @@
   <title>RepoTerrain — Codebase Intelligence</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS3DRenderer.js"></script>
-  <script type="module">
-    import { GestureRecognizer, FilesetResolver, DrawingUtils }
-      from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js";
-    window._MPImports = { GestureRecognizer, FilesetResolver, DrawingUtils };
+  <script>
+    // Load MediaPipe eagerly and expose a promise so toggleHandTracking can await it
+    window._mpReady = (async () => {
+      try {
+        const mod = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js");
+        window._MPImports = {
+          GestureRecognizer: mod.GestureRecognizer,
+          FilesetResolver:   mod.FilesetResolver,
+          DrawingUtils:      mod.DrawingUtils,
+        };
+      } catch(e) {
+        console.warn('MediaPipe failed to load:', e);
+        window._MPImports = null;
+      }
+    })();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -504,6 +515,12 @@
 <!-- ═══ HUD ═══ -->
 <div id="hud">
   <div class="hud-bar">
+    <a href="/" style="display:flex;align-items:center;gap:7px;text-decoration:none;margin-right:6px;flex-shrink:0">
+      <div style="width:28px;height:28px;background:#131a2e;border:1px solid rgba(6,182,212,0.3);border-radius:7px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 10px rgba(6,182,212,0.2)">
+        <svg width="16" height="16" viewBox="0 0 20 20" fill="none"><polygon points="10,3 18,17 2,17" fill="url(#hudtri)" stroke="rgba(34,211,238,0.3)" stroke-width="0.8" stroke-linejoin="round"/><defs><linearGradient id="hudtri" x1="10" y1="3" x2="10" y2="17" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#06b6d4"/></linearGradient></defs></svg>
+      </div>
+      <span style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:#fff;letter-spacing:-0.2px"><span style="color:#06b6d4">Repo</span>Terrain</span>
+    </a>
     <div class="repo-tag" id="hud-repo">gitlab.com/…</div>
     <div class="hud-stat"><strong id="stat-files">0</strong> files</div>
     <div class="hud-stat"><strong id="stat-clusters">0</strong> clusters</div>
@@ -638,11 +655,27 @@
     <div class="heat-modal-close" onclick="closeHeatModal()">×</div>
   </div>
   <canvas id="heat-modal-canvas"></canvas>
-  <div class="heat-modal-tips">
-    <div class="heat-tip"><strong>🔴 Red peaks</strong>Core active files with highest commit activity and central importance to the repo.</div>
+  <div class="heat-modal-tips" id="heat-modal-tips">
+    <div class="heat-tip"><strong>🔴 Red peaks</strong>Core active files with highest activity and central importance to the repo.</div>
     <div class="heat-tip"><strong>🟠 Orange slopes</strong>Warm files — recently modified, supporting modules that see regular changes.</div>
     <div class="heat-tip"><strong>🔵 Blue valleys</strong>Cold legacy code — rarely touched docs, deprecated utilities, and tech debt zones.</div>
     <div class="heat-tip"><strong>💡 How to use</strong>Compare peak heights across clusters. Flat terrain = inactive area. Tall spikes = active core.</div>
+  </div>
+  <div id="heat-modal-stats" style="display:none;width:90%;max-width:900px;margin-top:10px;display:none">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:10px;padding:12px 14px">
+        <div style="font-family:var(--mono);font-size:9px;color:#f87171;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px">🔴 Hottest Files</div>
+        <div id="hm-hot-list" style="font-size:11px;color:var(--text2);line-height:1.9"></div>
+      </div>
+      <div style="background:rgba(6,182,212,0.05);border:1px solid rgba(6,182,212,0.15);border-radius:10px;padding:12px 14px">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--accent2);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px">🗂 Cluster Map</div>
+        <div id="hm-cluster-list" style="font-size:11px;color:var(--text2);line-height:1.9"></div>
+      </div>
+      <div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:10px;padding:12px 14px">
+        <div style="font-family:var(--mono);font-size:9px;color:#60a5fa;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px">🔵 Cold Zones</div>
+        <div id="hm-cold-list" style="font-size:11px;color:var(--text2);line-height:1.9"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -822,7 +855,7 @@ function renderHeatBg() {
   heatAnimId=requestAnimationFrame(renderHeatBg);
 }
 
-/* Heat Modal */
+/* Heat Modal — live data */
 let modalT=0, modalRunning=false;
 function openHeatModal() {
   document.getElementById('heat-modal').classList.add('open');
@@ -831,14 +864,109 @@ function openHeatModal() {
   heatModalW=mc.width=mc.offsetWidth;
   heatModalH=mc.height=mc.offsetHeight;
   if(!heatData)generateDefaultHeat();
+
+  // Populate live stats if terrain is loaded
+  if(terrainNodes && terrainNodes.length > 0) {
+    document.getElementById('heat-modal-tips').style.display='none';
+    const statsEl = document.getElementById('heat-modal-stats');
+    statsEl.style.display='block';
+
+    // Hot files
+    const sorted = [...terrainNodes].sort((a,b)=>b.heat-a.heat);
+    const hotTop = sorted.slice(0,8);
+    const coldTop = sorted.slice(-8).reverse();
+    document.getElementById('hm-hot-list').innerHTML = hotTop.map(n=>{
+      const pct=Math.round(n.heat*100);
+      const bar=`<span style="display:inline-block;width:${Math.round(pct*.4)}px;height:3px;background:#ef4444;border-radius:2px;vertical-align:middle;margin-left:4px;opacity:0.7"></span>`;
+      return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+        <span style="color:var(--text);font-family:var(--mono);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px" title="${n.path}">${n.name}</span>
+        <span style="color:#f87171;font-family:var(--mono);font-size:9px;flex-shrink:0">${pct}%${bar}</span>
+      </div>`;
+    }).join('');
+
+    // Clusters
+    const clusters={};
+    terrainNodes.forEach(n=>{
+      const cluster=n.path.split('/').slice(-2,-1)[0]||'root';
+      if(!clusters[cluster])clusters[cluster]={count:0,heat:0};
+      clusters[cluster].count++; clusters[cluster].heat+=n.heat;
+    });
+    const clusterArr=Object.entries(clusters).map(([k,v])=>({name:k,count:v.count,avgHeat:v.heat/v.count})).sort((a,b)=>b.avgHeat-a.avgHeat);
+    document.getElementById('hm-cluster-list').innerHTML = clusterArr.slice(0,8).map(c=>{
+      const pct=Math.round(c.avgHeat*100);
+      const col=pct>66?'#f87171':pct>33?'#f59e0b':'#60a5fa';
+      return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+        <span style="color:var(--text);font-family:var(--mono);font-size:10px">${c.name.toUpperCase().slice(0,10)}</span>
+        <span style="color:${col};font-family:var(--mono);font-size:9px">${c.count}f · ${pct}%</span>
+      </div>`;
+    }).join('');
+
+    // Cold files
+    document.getElementById('hm-cold-list').innerHTML = coldTop.map(n=>{
+      const pct=Math.round(n.heat*100);
+      return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+        <span style="color:var(--text2);font-family:var(--mono);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px" title="${n.path}">${n.name}</span>
+        <span style="color:#60a5fa;font-family:var(--mono);font-size:9px;flex-shrink:0">${pct}%</span>
+      </div>`;
+    }).join('');
+
+    // Update canvas height to leave room for stats
+    mc.style.height='42vh';
+  } else {
+    document.getElementById('heat-modal-tips').style.display='flex';
+    document.getElementById('heat-modal-stats').style.display='none';
+    mc.style.height='60vh';
+  }
+
   modalRunning=true;
   function renderModal() {
     if(!modalRunning)return;
     modalT+=0.004;
+    heatModalW=mc.width=mc.offsetWidth;
+    heatModalH=mc.height=mc.offsetHeight;
     drawHeatCanvas(heatModalCtx,heatModalW,heatModalH,modalT,1.15);
+    // Draw file name labels on hot peaks in modal
+    if(terrainNodes&&terrainNodes.length>0) drawHeatLabels(heatModalCtx,heatModalW,heatModalH);
     heatModalAnimId=requestAnimationFrame(renderModal);
   }
   renderModal();
+}
+
+function drawHeatLabels(ctx, W, H) {
+  if(!terrainNodes||!terrainNodes.length)return;
+  const G=HEAT_GRID;
+  const originX=W*.5, originY=H*.72;
+  const scaleX=W*.016*1.15, scaleY=H*.008*1.15, heightScale=H*.22*1.15;
+  function project(col,row,height) {
+    const nx=(col/G-.5)*2, ny=(row/G-.5)*2;
+    return { sx:originX+(nx-ny)*scaleX*G*.5, sy:originY+(nx+ny)*scaleY*G*.3-height*heightScale };
+  }
+  // Only label the top 6 hottest files
+  const hot=[...terrainNodes].sort((a,b)=>b.heat-a.heat).slice(0,6);
+  ctx.save();
+  hot.forEach(n=>{
+    const gx=Math.floor(((n.x+1)/2)*(G-1));
+    const gy=Math.floor(((n.z+1)/2)*(G-1));
+    const h=heatData[Math.max(0,Math.min(G,gy))]?.[Math.max(0,Math.min(G,gx))]||n.heat;
+    const pt=project(gx,gy,h*1.2);
+    const name=n.name.length>16?n.name.slice(0,14)+'…':n.name;
+    const pct=Math.round(n.heat*100);
+    ctx.font='bold 10px "JetBrains Mono",monospace';
+    const tw=ctx.measureText(name).width;
+    // pill background
+    ctx.fillStyle='rgba(10,14,26,0.82)';
+    ctx.beginPath(); ctx.roundRect(pt.sx-tw/2-5,pt.sy-22,tw+10,16,4); ctx.fill();
+    ctx.strokeStyle=pct>66?'rgba(239,68,68,0.6)':'rgba(245,158,11,0.5)';
+    ctx.lineWidth=0.8; ctx.stroke();
+    // text
+    ctx.fillStyle=pct>66?'#f87171':'#fbbf24';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(name,pt.sx,pt.sy-14);
+    // heat dot
+    ctx.beginPath(); ctx.arc(pt.sx,pt.sy-3,2.5,0,Math.PI*2);
+    ctx.fillStyle=pct>66?'#ef4444':'#f59e0b'; ctx.fill();
+  });
+  ctx.restore();
 }
 function closeHeatModal() {
   document.getElementById('heat-modal').classList.remove('open');
@@ -1308,26 +1436,62 @@ async function toggleHandTracking() {
   const btn=document.getElementById('btn-hand'),wrap=document.getElementById('webcam-wrap'),sidebar=document.getElementById('gesture-sidebar');
   if(handTrackingActive){handTrackingActive=false;btn.classList.remove('on');wrap.style.display='none';sidebar.classList.remove('visible');closeGestureDetail();return;}
   handTrackingActive=true;btn.classList.add('on');wrap.style.display='block';sidebar.classList.add('visible');
+  document.getElementById('hand-label').textContent='⏳ Loading MediaPipe…';
   try {
-    const stream=await navigator.mediaDevices.getUserMedia({video:true});
+    // Wait for the eager-load promise to settle
+    await window._mpReady;
+    if(!window._MPImports){
+      document.getElementById('hand-label').textContent='⚠ MediaPipe unavailable';
+      return;
+    }
+    const stream=await navigator.mediaDevices.getUserMedia({video:{width:320,height:240,facingMode:'user'}});
     const video=document.getElementById('webcam'); video.srcObject=stream; await video.play();
-    await new Promise(r=>setTimeout(r,500));
-    if(!window._MPImports){document.getElementById('hand-label').textContent='⚠ MediaPipe loading…';return;}
+    document.getElementById('hand-label').textContent='⏳ Initializing model…';
     const{GestureRecognizer,FilesetResolver}=window._MPImports;
     const vision=await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
-    const recognizer=await GestureRecognizer.createFromOptions(vision,{baseOptions:{modelAssetPath:"https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task",delegate:"GPU"},runningMode:"VIDEO",numHands:1});
-    const hc=document.getElementById('hand-canvas'),ctx=hc.getContext('2d');
+    // Try GPU first, fall back to CPU
+    let recognizer;
+    for(const delegate of ['GPU','CPU']){
+      try{
+        recognizer=await GestureRecognizer.createFromOptions(vision,{
+          baseOptions:{
+            modelAssetPath:"https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task",
+            delegate
+          },
+          runningMode:"VIDEO",numHands:1
+        });
+        break;
+      }catch(e){
+        console.warn(`MediaPipe delegate ${delegate} failed:`,e);
+        if(delegate==='CPU')throw e;
+      }
+    }
+    document.getElementById('hand-label').textContent='✋ Ready — show your hand';
+    const hc=document.getElementById('hand-canvas');
     function detectFrame(){
       if(!handTrackingActive)return;
       hc.width=video.videoWidth;hc.height=video.videoHeight;
-      const res=recognizer.recognizeForVideo(video,performance.now());
-      ctx.clearRect(0,0,hc.width,hc.height);
-      if(res.gestures.length>0){const g=res.gestures[0][0].categoryName,lm=res.landmarks[0];handleGesture(g,lm);document.getElementById('hand-label').textContent={Open_Palm:'🖐 Flying',Closed_Fist:'✊ Rotating',Pointing_Up:'☝ Selecting',Victory:'✌ Zooming'}[g]||`✋ ${g}`;}
-      else{document.getElementById('hand-label').textContent='✋ detecting…';}
+      try{
+        const res=recognizer.recognizeForVideo(video,performance.now());
+        if(res.gestures.length>0){
+          const g=res.gestures[0][0].categoryName,lm=res.landmarks[0];
+          handleGesture(g,lm);
+          document.getElementById('hand-label').textContent={
+            Open_Palm:'🖐 Flying',Closed_Fist:'✊ Rotating',
+            Pointing_Up:'☝ Selecting',Victory:'✌ Zooming'
+          }[g]||`✋ ${g}`;
+        }else{
+          document.getElementById('hand-label').textContent='✋ detecting…';
+        }
+      }catch(e){}
       requestAnimationFrame(detectFrame);
     }
     detectFrame();
-  } catch(err){document.getElementById('hand-label').textContent='⚠ Camera denied';}
+  } catch(err){
+    console.error('Hand tracking error:',err);
+    document.getElementById('hand-label').textContent='⚠ '+( err.name==='NotAllowedError'?'Camera permission denied':err.message||'Camera error');
+    handTrackingActive=false;btn.classList.remove('on');
+  }
 }
 
 function handleGesture(g,lm){
