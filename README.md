@@ -15,7 +15,8 @@
 
 <br/>
 
- **Google Cloud Rapid Agent Hackathon — GitLab Track — June 2026**
+<p><strong>Google Cloud Rapid Agent Hackathon — GitLab Track — June 2026</strong></p>
+
 > Transform any GitLab repository into a navigable 3D semantic terrain. Files float as cards positioned by AI similarity. A Gemini agent analyzes the codebase and creates real GitLab issues via MCP — all navigable with bare hands.
 
 <p>
@@ -28,7 +29,9 @@
   <a href="https://github.com/ashish-doing/repoterrain/blob/main/ARCHITECTURE.md">
     <img src="https://img.shields.io/badge/%F0%9F%93%90%20Architecture-deep%20dive-6B4FFF?style=for-the-badge" />
   </a>
-  
+  <a href="https://github.com/ashish-doing/repoterrain">
+    <img src="https://img.shields.io/badge/GitHub-ashish--doing%2Frepoterrain-181717?style=for-the-badge&logo=github" />
+  </a>
 </p>
 
 <br/>
@@ -48,15 +51,19 @@
 
 ---
 
+## The Problem
+
+Every developer has stared at a repo they've never seen before and had no idea where to start. File trees tell you nothing about relationships, activity, or importance — onboarding to a new codebase means days of reading and grepping, while tech debt hides invisibly in cold corners of the project.
+
 ## What It Does
 
 Paste any public GitLab repository URL. In ~15 seconds:
 
 - **Up to 150 files** are fetched, embedded with Google AI, and projected into 3D space via UMAP
 - **Semantic clusters** emerge — files grouped by directory and language proximity, not just raw folder structure
-- **Activity heat map** scores each file 0–1 from filename role, size, and tree depth — red = core/active, blue = legacy/docs
+- **Activity heat map** scores each file 0–1 from filename role, size, and tree depth — red/hot = core/active, blue/cold = legacy/docs
 - **Gemini 2.0 Flash agent** answers questions with real file content and live terrain stats as context
-- **GitLab MCP actions** create real issues, list open MRs, and fetch pipeline status — live, on the actual repo
+- **GitLab MCP actions** create real issues (via the official GitLab MCP server, REST v4 fallback), list open MRs, and fetch pipeline status — live, on the actual repo
 - **MediaPipe hand tracking** lets you fly, orbit, zoom, and select files with gestures — open palm to fly, pinch to zoom, point to select
 
 ```
@@ -66,17 +73,17 @@ Tested on gitlab-org/gitlab-runner → 149 files · multiple semantic clusters �
 ---
 
 ## Screenshots
- 
+
 | | |
 |---|---|
 | ![Landing page](./screenshots/landing.png) | ![3D terrain with agent](./screenshots/terrain-agent.png) |
 | **Landing page** — paste any GitLab repo URL to begin | **3D semantic terrain + Gemini agent** — agent reads the terrain and creates a real GitLab issue live |
 | ![Heat map](./screenshots/heatmap.png) | ![Hand tracking](./screenshots/hand-tracking.png) |
 | **Activity heat map** — hottest files, cluster map, and cold zones at a glance | **MediaPipe hand tracking** — navigate the terrain with gestures, no mouse needed |
- 
+
 ![GitLab issue created](./screenshots/gitlab-issue.png)
 **Live GitLab issue** — created by the agent, not simulated, viewable on `ashish-doing/repoterrain-demo`
- 
+
 ---
 
 ## Agent in Action
@@ -84,12 +91,27 @@ Tested on gitlab-org/gitlab-runner → 149 files · multiple semantic clusters �
 | Query | What Happens |
 |---|---|
 | `"What's the most complex module?"` | Gemini reads terrain stats + real file content → structured analysis citing actual filenames |
-| `"Create an issue for cold zones"` | Real GitLab issue created on `ashish-doing/repoterrain-demo` with labels + clickable URL returned in chat |
+| `"Create an issue for cold zones"` | Real GitLab issue created on `ashish-doing/repoterrain-demo` via MCP (REST fallback), with labels + clickable URL returned in chat |
 | `"Explain the CI cluster"` | Reads actual files in the selected cluster, explains how they relate |
 | `"List open MRs"` | Fetches live merge requests via the GitLab REST API |
 | `"Get pipeline status"` | Fetches recent pipeline runs and their status |
 
 The agent's response format is fixed (module name, why it matters, key files, heat level, next action), so every answer stays grounded in the terrain that's actually on screen — no invented file paths.
+
+---
+
+## How It Works
+
+```mermaid
+flowchart LR
+    A["INPUT\nGitLab Repo URL\nPOST /ingest"] --> B["1 · Fetch\nfetch_repo_files()\nGitLab REST API v4\nup to 150 files"]
+    B --> C["2 · Embed\nembed_files()\ntext-embedding-004\n768-dim per file\n(TF-IDF fallback)"]
+    C --> D["3 · Project\nproject_to_3d()\nUMAP, cosine,\nn_neighbors=15"]
+    D --> E["4 · Render\nThree.js CSS3D\nfloating cards,\nheat colors, clusters"]
+    E --> F["5 · Agent\nGemini 2.0 Flash\nQ&A + GitLab MCP\nissues / MRs / pipelines"]
+```
+
+See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full system diagram, request/response sequence flows, and component breakdown.
 
 ---
 
@@ -104,23 +126,9 @@ The agent's response format is fixed (module name, why it matters, key files, he
 | **Dim Reduction** | UMAP (cosine, 3 components) | High-dim vectors → 3D coordinates |
 | **3D Engine** | Three.js + CSS3DRenderer | Floating file cards in semantic space |
 | **Hand Tracking** | MediaPipe Tasks Vision | Gesture-based terrain navigation |
-| **GitLab Actions** | GitLab MCP Server + REST API v4 fallback | Issue creation (MCP-first), MR listing, pipeline status |
+| **GitLab Actions** | GitLab MCP Server (HTTP, 2025-03-26 spec) + REST API v4 fallback | Issue creation, MR listing, pipeline status |
 | **Backend** | FastAPI + uvicorn + WebSockets | Ingest pipeline, agent API, real-time updates |
 | **Deployment** | Railway (Nixpacks) | Live public URL |
-
----
-
-## Architecture
-
-See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full system diagram, request/response flow, and component breakdown.
-
-**Short version:**
-
-```
-GitLab REST API v4 → Gemini Embeddings (or TF-IDF fallback) → UMAP 3D → Three.js terrain
-                                                                      |
-                                  Gemini 2.0 Flash agent (Groq quota-fallback) + GitLab MCP issue creation + REST API v4
-```
 
 ---
 
@@ -130,7 +138,7 @@ GitLab REST API v4 → Gemini Embeddings (or TF-IDF fallback) → UMAP 3D → Th
 |---|---|
 | Google Cloud AI (Gemini agent) | Done — Gemini 2.0 Flash for codebase Q&A and action reasoning |
 | Google Cloud AI (embeddings) | Done — `text-embedding-004` for semantic file positioning |
-| GitLab MCP actions | Done — MCP HTTP transport attempted first (`POST gitlab.com/api/v4/mcp`), REST API v4 fallback ensures reliable issue creation. Real issues created live on `ashish-doing/repoterrain-demo` |
+| GitLab MCP actions | Done — official GitLab MCP server (HTTP transport, `POST gitlab.com/api/v4/mcp`) attempted first, REST API v4 fallback ensures reliable issue creation. Real issues created live on `ashish-doing/repoterrain-demo` |
 | Agent takes real actions | Done — creates artifacts on GitLab, not just chat responses |
 | New project | Done — first commit May 23, 2026 (hackathon opened May 5, 2026) |
 | Public repo + live demo | Done — MIT license, deployed on Railway |
@@ -177,6 +185,7 @@ repoterrain/
 │   └── requirements.txt
 ├── docs/
 │   └── index.html         GitHub Pages mirror of the landing page
+├── screenshots/           README screenshots
 ├── ARCHITECTURE.md
 ├── deploy.sh               Cloud Run deployment script
 ├── nixpacks.toml           Railway build/start config
