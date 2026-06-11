@@ -20,7 +20,7 @@ from pydantic import BaseModel
 from pipeline import run_pipeline
 from agent import agent_query
 
-app = FastAPI(title="RepoTerrain API", version="2.0.0")
+app = FastAPI(title="RepoTerrain API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -82,7 +82,7 @@ async def health():
     gemini_key = bool(os.environ.get("GEMINI_API_KEY"))
     return {
         "status": "ok",
-        "version": "2.0.0",
+        "version": "1.0.0",
         "uptime_seconds": round(time.time() - start_time),
         "active_sessions": len(terrain_cache),
         # AI stack
