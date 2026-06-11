@@ -12,7 +12,7 @@ if sys.platform == "win32":
 import os
 import time
 from typing import Optional
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -25,13 +25,38 @@ app = FastAPI(title="RepoTerrain API", version="2.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 terrain_cache: dict = {}
 start_time = time.time()
+
+# ── Simple in-memory rate limiting ───────────────────────────
+# Protects shared Gemini/GitLab API quotas during public demos.
+# Keyed by client IP; sliding 60s window.
+_rate_buckets: dict = {}
+RATE_LIMITS = {
+    "/ingest":      (5, 60),    # 5 ingests per 60s per IP
+    "/agent/query": (15, 60),   # 15 agent queries per 60s per IP
+}
+
+
+def check_rate_limit(path: str, client_ip: str):
+    limit, window = RATE_LIMITS.get(path, (None, None))
+    if limit is None:
+        return
+    now = time.time()
+    key = (path, client_ip)
+    bucket = _rate_buckets.setdefault(key, [])
+    bucket[:] = [t for t in bucket if now - t < window]
+    if len(bucket) >= limit:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded: max {limit} requests per {window}s on {path}. Please wait and try again.",
+        )
+    bucket.append(now)
 
 
 # ── Pages ─────────────────────────────────────────────────────
@@ -67,7 +92,8 @@ async def health():
         "gemini_configured": gemini_key,
         "groq_fallback_configured": bool(os.environ.get("GROQ_API_KEY")),
         # GitLab integration
-        "gitlab_mcp_server": "https://gitlab.com/api/v4/mcp",
+        "gitlab_mcp_gateway": os.environ.get("GITLAB_MCP_GATEWAY_URL", "not configured"),
+        "gitlab_mcp_gateway_configured": bool(os.environ.get("GITLAB_MCP_GATEWAY_URL")),
         "gitlab_token_configured": bool(os.environ.get("GITLAB_TOKEN")),
     }
 
@@ -90,7 +116,8 @@ class AgentQueryRequest(BaseModel):
 # ── Ingest ────────────────────────────────────────────────────
 
 @app.post("/ingest")
-async def ingest_repo(req: IngestRequest):
+async def ingest_repo(req: IngestRequest, request: Request):
+    check_rate_limit("/ingest", request.client.host if request.client else "unknown")
     try:
         data = await run_pipeline(
             repo_url=req.repo_url,
@@ -113,7 +140,8 @@ async def ingest_repo(req: IngestRequest):
 # ── Agent ─────────────────────────────────────────────────────
 
 @app.post("/agent/query")
-async def query_agent(req: AgentQueryRequest):
+async def query_agent(req: AgentQueryRequest, request: Request):
+    check_rate_limit("/agent/query", request.client.host if request.client else "unknown")
     terrain = terrain_cache.get(req.session_id)
     if not terrain:
         raise HTTPException(status_code=404, detail="Session not found. Re-ingest the repo.")

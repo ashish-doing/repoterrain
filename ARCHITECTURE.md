@@ -177,28 +177,48 @@ If a Gemini embed call fails for a single file, `pipeline.py` substitutes a rand
 
 ---
 
-## GitLab MCP Actions
+## GitLab MCP Gateway
 
-The agent executes real GitLab operations via the REST API v4 — these are not simulated; issues created appear on the live repository.
+The official `gitlab.com/api/v4/mcp` server requires GitLab Premium/Ultimate with Duo enabled — not available on the free-tier `ashish-doing/repoterrain-demo` project this app targets. RepoTerrain instead self-hosts the open-source community server [`zereight/gitlab-mcp`](https://github.com/zereight/gitlab-mcp) (154 tools, MIT license) as a second Railway service, in **Streamable HTTP + Remote Authorization** mode — this is genuine MCP (JSON-RPC 2.0 over Streamable HTTP, `MCP-Protocol-Version: 2025-03-26`), not a REST shim, and works on any GitLab tier.
 
-```python
-# Issue creation (simplified)
-POST https://gitlab.com/api/v4/projects/{project_path}/issues
-{
-  "title": "...",
-  "description": "🤖 Created by RepoTerrain AI Agent\n\n...",
-  "labels": "repoterrain"  # or tech-debt/low-priority, needs-review/high-priority
-}
-# Returns: { "web_url": "https://gitlab.com/ashish-doing/repoterrain-demo/-/issues/N" }
+```mermaid
+flowchart LR
+    AG["agent.py\nclassify_intent()"] -->|"JSON-RPC 2.0\ntools/call\nPrivate-Token: <PAT>"| GW["mcp-gateway\n(Railway service)\nzereight/gitlab-mcp\nStreamable HTTP"]
+    GW -->|"create_issue\nlist_merge_requests\nlist_pipelines"| GL["gitlab.com/api/v4\nashish-doing/repoterrain-demo"]
+    AG -->|"if gateway unreachable\nor unconfigured"| REST["REST API v4\n(direct fallback)"]
+    REST --> GL
 ```
 
-| Intent (from `classify_intent`) | Action | Endpoint |
+| Intent (from `classify_intent`) | MCP Tool | REST Fallback |
 |---|---|---|
-| `create_issue` | `gitlab_create_issue()` | `POST /projects/ashish-doing%2Frepoterrain-demo/issues` |
-| `list_mrs` | `gitlab_list_mrs()` | `GET /merge_requests?state=opened&per_page=5` |
-| `get_pipelines` | `gitlab_get_pipelines()` | `GET /projects/:id/pipelines?per_page=5` |
+| `create_issue` | `create_issue` | `POST /projects/ashish-doing%2Frepoterrain-demo/issues` |
+| `list_mrs` | `list_merge_requests` | `GET /merge_requests?state=opened&per_page=5` |
+| `get_pipelines` | `list_pipelines` | `GET /projects/:id/pipelines?per_page=5` |
 
-Issue titles are extracted from the agent's first non-bullet response line; labels are chosen from the query keywords (`cold`/`legacy` -> `tech-debt, low-priority`, `hot`/`complex` -> `needs-review, high-priority`, otherwise `repoterrain`).
+```python
+# MCP tools/call (simplified) — sent to GITLAB_MCP_GATEWAY_URL
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "create_issue",
+    "arguments": {
+      "project_id": "ashish-doing/repoterrain-demo",
+      "title": "...",
+      "description": "🤖 Created by RepoTerrain AI Agent (via GitLab MCP)\n\n...",
+      "labels": ["repoterrain"]  # or tech-debt/low-priority, needs-review/high-priority
+    }
+  }
+}
+# Headers: Private-Token: <GITLAB_TOKEN>, MCP-Protocol-Version: 2025-03-26
+```
+
+If `GITLAB_MCP_GATEWAY_URL` is unset, or the gateway returns a non-2xx / errors / is unreachable, `agent.py` falls back to direct REST API v4 calls — every action still completes, but `via` in the response will read `gitlab-rest-api` instead of `gitlab-mcp-gateway`, so the response is fully transparent about which path served the request.
+
+Issue titles are extracted from the agent's first non-bullet response line; labels are chosen from query keywords (`cold`/`legacy` → `tech-debt, low-priority`, `hot`/`complex` → `needs-review, high-priority`, otherwise `repoterrain`).
+
+See [`mcp-gateway/`](../mcp-gateway/) for the gateway's Dockerfile and Railway deployment config.
 
 ---
 
@@ -231,25 +251,23 @@ Each session keeps its last 16 conversation turns (`history[-16:]`) so follow-up
 |---|---|---|
 | `GEMINI_API_KEY` | `pipeline.py` (embeddings), `agent.py` (chat) | Falls back to TF-IDF embeddings and Groq/demo agent |
 | `GROQ_API_KEY` | `agent.py` | Agent falls back to rule-based `demo_response()` |
-| `GITLAB_TOKEN` | `agent.py`, `pipeline.py` | GitLab MCP actions disabled; private repos inaccessible; public repos still ingestible |
+| `GITLAB_TOKEN` | `agent.py`, `pipeline.py` | GitLab actions disabled; private repos inaccessible; public repos still ingestible |
+| `GITLAB_MCP_GATEWAY_URL` | `agent.py` | Falls back to direct REST API v4 calls (still functional, `via: gitlab-rest-api`) |
 
 ---
 
 ## Deployment
 
-Hosted on Railway via `nixpacks.toml`:
+Two Railway services:
 
-```toml
-[phases.setup]
-nixPkgs = ["python310", "gcc"]
+**1. Main backend** (`backend/`) — built via Railway's Railpack builder, which reads `backend/.python-version` (3.12.3) and `backend/requirements.txt`:
 
-[phases.install]
-cmds = ["pip install -r backend/requirements.txt"]
-
-[start]
-cmd = "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
+```
+uvicorn main:app --host 0.0.0.0 --port $PORT
 ```
 
 `landing.html` and `index.html` are served directly by FastAPI (`/` and `/app`) — no separate frontend build step. `deploy.sh` provides an alternative Cloud Run deployment path using Docker + `gcloud run deploy`.
+
+**2. MCP gateway** (`mcp-gateway/`) — Dockerfile-based service running `zereight/gitlab-mcp` in Streamable HTTP + Remote Authorization mode. The main backend's `GITLAB_MCP_GATEWAY_URL` env var points at this service's `/mcp` endpoint. See [`mcp-gateway/README.md`](../mcp-gateway/README.md).
 
 Live URL: `https://repoterrain-production.up.railway.app`

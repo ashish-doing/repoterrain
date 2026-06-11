@@ -19,8 +19,12 @@ GITLAB_TOKEN   = os.environ.get("GITLAB_TOKEN", "")
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 GROQ_URL   = "https://api.groq.com/openai/v1/chat/completions"
 
-# GitLab MCP server — official hosted endpoint
-GITLAB_MCP_URL = "https://gitlab.com/api/v4/mcp"
+# GitLab MCP — self-hosted community gateway (zereight/gitlab-mcp)
+# The official gitlab.com/api/v4/mcp server requires GitLab Premium/Ultimate
+# + Duo, so we run the open-source community MCP server (Streamable HTTP +
+# Remote Authorization) as a second Railway service. Same MCP protocol
+# (JSON-RPC 2.0, MCP-Protocol-Version 2025-03-26), works on free-tier GitLab.
+GITLAB_MCP_GATEWAY_URL = os.environ.get("GITLAB_MCP_GATEWAY_URL", "")
 
 SYSTEM_PROMPT = """You are RepoTerrain's codebase intelligence agent — powered by Google Gemini.
 You analyze GitLab repositories visualized as a live 3D semantic terrain.
@@ -323,10 +327,13 @@ async def execute_gitlab_actions(query: str, response_text: str, repo_url: str =
 
 async def gitlab_create_issue_mcp(title: str, description: str, labels: list, project_path: str) -> Optional[dict]:
     """
-    Create GitLab issue via the official GitLab MCP server (HTTP transport, 2025-03-26 spec).
-    Falls back to REST if MCP endpoint is unavailable.
+    Create a GitLab issue via the self-hosted GitLab MCP gateway
+    (zereight/gitlab-mcp, Streamable HTTP + Remote Authorization,
+    MCP-Protocol-Version 2025-03-26, JSON-RPC 2.0 tools/call -> create_issue).
+
+    Falls back to REST v4 if the gateway is unreachable or unconfigured.
     """
-    if not GITLAB_TOKEN:
+    if not GITLAB_TOKEN or not GITLAB_MCP_GATEWAY_URL:
         return None
 
     mcp_payload = {
@@ -336,9 +343,9 @@ async def gitlab_create_issue_mcp(title: str, description: str, labels: list, pr
         "params": {
             "name": "create_issue",
             "arguments": {
-                "project": project_path.replace("%2F", "/"),
+                "project_id": project_path.replace("%2F", "/"),
                 "title": title,
-                "description": f"🤖 Created by RepoTerrain AI Agent\n\n{description}",
+                "description": f"🤖 Created by RepoTerrain AI Agent (via GitLab MCP)\n\n{description}",
                 "labels": labels,
             }
         }
@@ -347,20 +354,30 @@ async def gitlab_create_issue_mcp(title: str, description: str, labels: list, pr
     try:
         async with httpx.AsyncClient(timeout=20) as client:
             r = await client.post(
-                GITLAB_MCP_URL,
+                GITLAB_MCP_GATEWAY_URL,
                 headers={
-                    "PRIVATE-TOKEN": GITLAB_TOKEN,
+                    "Private-Token": GITLAB_TOKEN,
                     "Content-Type": "application/json",
+                    "Accept": "application/json, text/event-stream",
                     "MCP-Protocol-Version": "2025-03-26",
                 },
                 json=mcp_payload,
             )
 
             if r.status_code not in (200, 201, 202):
-                print(f"[agent] GitLab MCP HTTP {r.status_code} — falling back to REST")
+                print(f"[agent] GitLab MCP gateway HTTP {r.status_code} — falling back to REST")
                 return None
 
-            data = r.json()
+            # Streamable HTTP can return SSE-framed JSON ("data: {...}") or plain JSON
+            raw = r.text.strip()
+            if raw.startswith("data:"):
+                raw = raw.split("data:", 1)[1].strip().splitlines()[0]
+            data = json.loads(raw)
+
+            if "error" in data:
+                print(f"[agent] GitLab MCP tool error: {data['error']}")
+                return None
+
             result = data.get("result", {})
             content = result.get("content", [{}])
             text_block = next((c for c in content if c.get("type") == "text"), {})
@@ -374,11 +391,11 @@ async def gitlab_create_issue_mcp(title: str, description: str, labels: list, pr
                 "url":   issue_data.get("web_url", ""),
                 "id":    issue_data.get("iid", ""),
                 "title": issue_data.get("title", title),
-                "via":   "gitlab-mcp-server",
+                "via":   "gitlab-mcp-gateway",
             }
 
     except Exception as e:
-        print(f"[agent] GitLab MCP exception: {e} — falling back to REST")
+        print(f"[agent] GitLab MCP gateway exception: {e} — falling back to REST")
         return None
 
 
@@ -408,7 +425,52 @@ async def gitlab_create_issue_rest(title: str, description: str, labels: list, p
         return None
 
 
+async def call_mcp_tool(tool_name: str, arguments: dict) -> Optional[dict]:
+    """Generic MCP gateway call — JSON-RPC 2.0 tools/call over Streamable HTTP."""
+    if not GITLAB_TOKEN or not GITLAB_MCP_GATEWAY_URL:
+        return None
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {"name": tool_name, "arguments": arguments},
+    }
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            r = await client.post(
+                GITLAB_MCP_GATEWAY_URL,
+                headers={
+                    "Private-Token": GITLAB_TOKEN,
+                    "Content-Type": "application/json",
+                    "Accept": "application/json, text/event-stream",
+                    "MCP-Protocol-Version": "2025-03-26",
+                },
+                json=payload,
+            )
+            if r.status_code not in (200, 201, 202):
+                return None
+            raw = r.text.strip()
+            if raw.startswith("data:"):
+                raw = raw.split("data:", 1)[1].strip().splitlines()[0]
+            data = json.loads(raw)
+            if "error" in data:
+                print(f"[agent] MCP tool {tool_name} error: {data['error']}")
+                return None
+            content = data.get("result", {}).get("content", [{}])
+            text_block = next((c for c in content if c.get("type") == "text"), {})
+            return json.loads(text_block.get("text", "null"))
+    except Exception as e:
+        print(f"[agent] MCP tool {tool_name} exception: {e}")
+        return None
+
+
 async def gitlab_list_mrs() -> Optional[list]:
+    mcp_result = await call_mcp_tool("list_merge_requests", {"state": "opened", "per_page": 5})
+    if mcp_result:
+        items = mcp_result if isinstance(mcp_result, list) else mcp_result.get("items", [])
+        if items:
+            return [{"title": mr.get("title"), "url": mr.get("web_url"), "state": mr.get("state")} for mr in items[:5]]
+
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.get(
@@ -424,6 +486,13 @@ async def gitlab_list_mrs() -> Optional[list]:
 
 
 async def gitlab_get_pipelines() -> Optional[list]:
+    project_path = "ashish-doing/repoterrain-demo"
+    mcp_result = await call_mcp_tool("list_pipelines", {"project_id": project_path, "per_page": 5})
+    if mcp_result:
+        items = mcp_result if isinstance(mcp_result, list) else mcp_result.get("items", [])
+        if items:
+            return [{"id": p.get("id"), "status": p.get("status"), "ref": p.get("ref")} for p in items[:5]]
+
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.get(

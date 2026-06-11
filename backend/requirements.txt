@@ -6,3 +6,5 @@ python-dotenv>=1.0.0
 umap-learn>=0.5.6
 numpy>=1.26.0
 scikit-learn>=1.3.0
+# Dev / testing (not required for production deploy)
+pytest>=8.0.0
