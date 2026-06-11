@@ -167,7 +167,7 @@ If a Gemini embed call fails for a single file, `pipeline.py` substitutes a rand
 
 `compute_metadata()` derives, per file:
 
-- **`heat`** (0.05–1.0) — base 0.2, boosted for filenames matching core/entry patterns (`main`, `index`, `app`, `server`, `router`, `config`, `auth`, `core`, `client`, `engine`, ...), reduced for `test`, `spec`, `mock`, `readme`, `changelog`, etc., plus a contribution from file size and tree depth (shallower files run hotter).
+- **`heat`** (0.05–1.0) — base 0.2, boosted for filenames matching core/entry patterns (`main`, `index`, `app`, `server`, `router`, `config`, `auth`, `core`, `client`, `engine`, ...), reduced for `test`, `spec`, `mock`, `readme`, `changelog`, etc., plus a contribution from file size and tree depth (shallower files run hotter). Heat is a proxy for activity — the GitLab API does not expose commit frequency without authentication, so filename role and size are used as signals instead.
 - **`language`** — derived from file extension via a fixed extension map.
 - **`size`** — `min(content_length / 5000, 1.0)`.
 

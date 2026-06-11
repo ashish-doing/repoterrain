@@ -54,7 +54,7 @@ Paste any public GitLab repository URL. In ~15 seconds:
 
 - **Up to 150 files** fetched via GitLab REST API v4, embedded with Google AI `text-embedding-004`, projected into 3D space via UMAP
 - **Semantic clusters** emerge — files grouped by directory proximity, not just raw folder structure
-- **Activity heat map** scores each file 0–1 from filename role, size, and tree depth — red = core/active, blue = legacy/docs
+- **Activity heat map** scores each file 0–1 from filename role, size, and tree depth — a proxy for activity since GitLab API doesn't expose commit frequency without authentication. Red = core/active, blue = legacy/docs
 - **Gemini 2.0 Flash agent** answers questions with real file content and live terrain stats as context; falls back to Groq LLaMA 3.1 if quota exceeded
 - **GitLab MCP actions** create real issues, list open MRs, and fetch pipeline status — via a self-hosted `zereight/gitlab-mcp` gateway (Streamable HTTP, MCP-Protocol-Version 2025-03-26), with REST API v4 as transparent fallback
 - **MediaPipe hand tracking** — open palm to fly, pinch to zoom, point to select files, fist to rotate
