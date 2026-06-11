@@ -218,7 +218,7 @@ If `GITLAB_MCP_GATEWAY_URL` is unset, or the gateway returns a non-2xx / errors 
 
 Issue titles are extracted from the agent's first non-bullet response line; labels are chosen from query keywords (`cold`/`legacy` → `tech-debt, low-priority`, `hot`/`complex` → `needs-review, high-priority`, otherwise `repoterrain`).
 
-See [`mcp-gateway/`](../mcp-gateway/) for the gateway's Dockerfile and Railway deployment config.
+See [`mcp-gateway/`](./mcp-gateway/) for the gateway's Dockerfile and Railway deployment config.
 
 ---
 
@@ -268,6 +268,6 @@ uvicorn main:app --host 0.0.0.0 --port $PORT
 
 `landing.html` and `index.html` are served directly by FastAPI (`/` and `/app`) — no separate frontend build step. `deploy.sh` provides an alternative Cloud Run deployment path using Docker + `gcloud run deploy`.
 
-**2. MCP gateway** (`mcp-gateway/`) — Dockerfile-based service running `zereight/gitlab-mcp` in Streamable HTTP + Remote Authorization mode. The main backend's `GITLAB_MCP_GATEWAY_URL` env var points at this service's `/mcp` endpoint. See [`mcp-gateway/README.md`](../mcp-gateway/README.md).
+**2. MCP gateway** (`mcp-gateway/`) — Dockerfile-based service running `zereight/gitlab-mcp` in Streamable HTTP + Remote Authorization mode. The main backend's `GITLAB_MCP_GATEWAY_URL` env var points at this service's `/mcp` endpoint. See [`mcp-gateway/README.md`](./mcp-gateway/README.md).
 
 Live URL: `https://repoterrain-production.up.railway.app`
