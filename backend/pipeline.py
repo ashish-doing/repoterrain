@@ -83,6 +83,11 @@ async def fetch_repo_files(repo_url: str, token: Optional[str] = None, max_files
             page += 1
 
         print(f"[pipeline] Total tree items: {len(all_items)}")
+        type_counts = {}
+        for item in all_items:
+            type_counts[item.get("type")] = type_counts.get(item.get("type"), 0) + 1
+        print(f"[pipeline] Item types: {type_counts}")
+        print(f"[pipeline] First 5 items: {all_items[:5]}")
 
         file_paths = [
             item["path"] for item in all_items
