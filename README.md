@@ -104,7 +104,7 @@ The agent's response format is fixed (module name, why it matters, key files, he
 | **Dim Reduction** | UMAP (cosine, 3 components) | High-dim vectors → 3D coordinates |
 | **3D Engine** | Three.js + CSS3DRenderer | Floating file cards in semantic space |
 | **Hand Tracking** | MediaPipe Tasks Vision | Gesture-based terrain navigation |
-| **GitLab Actions** | GitLab REST API v4 | Issue creation, MR listing, pipeline status |
+| **GitLab Actions** | GitLab MCP Server + REST API v4 fallback | Issue creation (MCP-first), MR listing, pipeline status |
 | **Backend** | FastAPI + uvicorn + WebSockets | Ingest pipeline, agent API, real-time updates |
 | **Deployment** | Railway (Nixpacks) | Live public URL |
 
@@ -119,7 +119,7 @@ See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full system diagram, request/
 ```
 GitLab REST API v4 → Gemini Embeddings (or TF-IDF fallback) → UMAP 3D → Three.js terrain
                                                                       |
-                                  Gemini 2.0 Flash agent (or Groq fallback) + GitLab MCP actions
+                                  Gemini 2.0 Flash agent (Groq quota-fallback) + GitLab MCP issue creation + REST API v4
 ```
 
 ---
@@ -130,7 +130,7 @@ GitLab REST API v4 → Gemini Embeddings (or TF-IDF fallback) → UMAP 3D → Th
 |---|---|
 | Google Cloud AI (Gemini agent) | Done — Gemini 2.0 Flash for codebase Q&A and action reasoning |
 | Google Cloud AI (embeddings) | Done — `text-embedding-004` for semantic file positioning |
-| GitLab MCP actions | Done — real issue creation, MR listing, pipeline status via GitLab REST API v4 |
+| GitLab MCP actions | Done — MCP HTTP transport attempted first (`POST gitlab.com/api/v4/mcp`), REST API v4 fallback ensures reliable issue creation. Real issues created live on `ashish-doing/repoterrain-demo` |
 | Agent takes real actions | Done — creates artifacts on GitLab, not just chat responses |
 | New project | Done — first commit May 23, 2026 (hackathon opened May 5, 2026) |
 | Public repo + live demo | Done — MIT license, deployed on Railway |
