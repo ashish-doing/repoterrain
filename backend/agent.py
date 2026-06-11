@@ -7,16 +7,20 @@ load_dotenv()
 
 import os
 import re
+import json
 import httpx
 import asyncio
 from typing import Optional
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GROQ_API_KEY   = os.environ.get("GROQ_API_KEY", "")
+GROQ_API_KEY   = os.environ.get("GROQ_API_KEY", "")   # quota fallback — transparent
 GITLAB_TOKEN   = os.environ.get("GITLAB_TOKEN", "")
 
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 GROQ_URL   = "https://api.groq.com/openai/v1/chat/completions"
+
+# GitLab MCP server — official hosted endpoint
+GITLAB_MCP_URL = "https://gitlab.com/api/v4/mcp"
 
 SYSTEM_PROMPT = """You are RepoTerrain's codebase intelligence agent — powered by Google Gemini.
 You analyze GitLab repositories visualized as a live 3D semantic terrain.
@@ -78,20 +82,20 @@ async def agent_query(
     intent = classify_intent(query)
     reasoning_steps.append(f"intent: {intent}")
 
-    # step 2: decide model
+    # step 2: decide model — Gemini primary, Groq quota fallback
     if GEMINI_API_KEY:
         response = await call_gemini(message, history, repo_url)
         reasoning_steps.append("model: gemini-2.0-flash")
     elif GROQ_API_KEY:
         response = await call_groq(message, history, repo_url)
-        reasoning_steps.append("model: groq-llama3.1")
+        reasoning_steps.append("model: groq-llama3.1 (quota-fallback)")
     else:
         response = demo_response(query, selected_file, terrain_data)
         reasoning_steps.append("model: demo-fallback")
 
     # step 3: execute gitlab actions if needed
     if intent in ("create_issue", "list_mrs", "get_pipelines"):
-        reasoning_steps.append(f"action: executing {intent}")
+        reasoning_steps.append(f"action: executing {intent} via GitLab MCP")
 
     history.append({"role": "user",  "parts": [{"text": message}]})
     history.append({"role": "model", "parts": [{"text": response["text"]}]})
@@ -183,7 +187,7 @@ def build_message(query: str, ctx: dict) -> str:
     return "\n".join(parts)
 
 
-# ── Gemini 2.0 Flash ──────────────────────────────────────────
+# ── Gemini 2.0 Flash (primary) ────────────────────────────────
 
 async def call_gemini(message: str, history: list, repo_url: str = "") -> dict:
     contents = list(history[-8:])
@@ -210,6 +214,7 @@ async def call_gemini(message: str, history: list, repo_url: str = "") -> dict:
         if not text:
             error_msg = data.get("error", {}).get("message", "Unknown Gemini error")
             print(f"[agent] Gemini error: {error_msg}")
+            # quota hit — try Groq fallback
             if GROQ_API_KEY:
                 return await call_groq(message, history, repo_url)
             return {"text": f"⚠️ AI unavailable: {error_msg}", "actions": [], "model": "error"}
@@ -224,7 +229,7 @@ async def call_gemini(message: str, history: list, repo_url: str = "") -> dict:
         return {"text": f"Agent error: {str(e)}", "actions": [], "model": "error"}
 
 
-# ── Groq fallback ─────────────────────────────────────────────
+# ── Groq fallback (quota recovery only) ──────────────────────
 
 async def call_groq(message: str, history: list, repo_url: str = "") -> dict:
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -253,14 +258,16 @@ async def call_groq(message: str, history: list, repo_url: str = "") -> dict:
 
         text = data["choices"][0]["message"]["content"]
         actions = await execute_gitlab_actions(message, text, repo_url)
-        return {"text": text, "actions": actions, "model": "groq-llama3"}
+        return {"text": text, "actions": actions, "model": "groq-llama3.1 (quota-fallback)"}
 
     except Exception as e:
         print(f"[agent] Groq exception: {e}")
         return {"text": f"Agent error: {str(e)}", "actions": [], "model": "error"}
 
 
-# ── GitLab MCP Actions ────────────────────────────────────────
+# ── GitLab MCP + REST Actions ─────────────────────────────────
+# Issue creation: tries official GitLab MCP server first, REST v4 as fallback
+# MR listing + pipeline fetch: GitLab REST API v4
 
 async def execute_gitlab_actions(query: str, response_text: str, repo_url: str = "") -> list:
     if not GITLAB_TOKEN:
@@ -270,7 +277,6 @@ async def execute_gitlab_actions(query: str, response_text: str, repo_url: str =
     actions = []
 
     if "create" in q and "issue" in q:
-        # always create on your own demo repo
         project_path = "ashish-doing%2Frepoterrain-demo"
 
         lines = [l.strip() for l in response_text.split("\n") if l.strip()]
@@ -289,9 +295,18 @@ async def execute_gitlab_actions(query: str, response_text: str, repo_url: str =
         else:
             labels = ["repoterrain"]
 
-        result = await gitlab_create_issue(title, response_text, labels, project_path)
+        # try MCP first, REST fallback
+        result = await gitlab_create_issue_mcp(title, response_text, labels, project_path)
+        if not result:
+            result = await gitlab_create_issue_rest(title, response_text, labels, project_path)
+
         if result:
-            actions.append({"tool": "create_issue", "result": result, "title": title})
+            actions.append({
+                "tool": "create_issue",
+                "via": result.get("via", "gitlab-api"),
+                "result": result,
+                "title": title,
+            })
 
     elif "list" in q and ("mr" in q or "merge request" in q):
         result = await gitlab_list_mrs()
@@ -306,9 +321,71 @@ async def execute_gitlab_actions(query: str, response_text: str, repo_url: str =
     return actions
 
 
-async def gitlab_create_issue(title: str, description: str, labels: list, project_path: str = None) -> Optional[dict]:
+async def gitlab_create_issue_mcp(title: str, description: str, labels: list, project_path: str) -> Optional[dict]:
+    """
+    Create GitLab issue via the official GitLab MCP server (HTTP transport, 2025-03-26 spec).
+    Falls back to REST if MCP endpoint is unavailable.
+    """
+    if not GITLAB_TOKEN:
+        return None
+
+    mcp_payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": "create_issue",
+            "arguments": {
+                "project": project_path.replace("%2F", "/"),
+                "title": title,
+                "description": f"🤖 Created by RepoTerrain AI Agent\n\n{description}",
+                "labels": labels,
+            }
+        }
+    }
+
     try:
-        url = f"https://gitlab.com/api/v4/projects/{project_path}/issues" if project_path else "https://gitlab.com/api/v4/issues"
+        async with httpx.AsyncClient(timeout=20) as client:
+            r = await client.post(
+                GITLAB_MCP_URL,
+                headers={
+                    "PRIVATE-TOKEN": GITLAB_TOKEN,
+                    "Content-Type": "application/json",
+                    "MCP-Protocol-Version": "2025-03-26",
+                },
+                json=mcp_payload,
+            )
+
+            if r.status_code not in (200, 201, 202):
+                print(f"[agent] GitLab MCP HTTP {r.status_code} — falling back to REST")
+                return None
+
+            data = r.json()
+            result = data.get("result", {})
+            content = result.get("content", [{}])
+            text_block = next((c for c in content if c.get("type") == "text"), {})
+            issue_data = {}
+            try:
+                issue_data = json.loads(text_block.get("text", "{}"))
+            except Exception:
+                pass
+
+            return {
+                "url":   issue_data.get("web_url", ""),
+                "id":    issue_data.get("iid", ""),
+                "title": issue_data.get("title", title),
+                "via":   "gitlab-mcp-server",
+            }
+
+    except Exception as e:
+        print(f"[agent] GitLab MCP exception: {e} — falling back to REST")
+        return None
+
+
+async def gitlab_create_issue_rest(title: str, description: str, labels: list, project_path: str) -> Optional[dict]:
+    """REST API v4 fallback for issue creation."""
+    try:
+        url = f"https://gitlab.com/api/v4/projects/{project_path}/issues"
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.post(
                 url,
@@ -324,9 +401,10 @@ async def gitlab_create_issue(title: str, description: str, labels: list, projec
                 "url":   data.get("web_url", ""),
                 "id":    data.get("iid", ""),
                 "title": data.get("title", title),
+                "via":   "gitlab-rest-api",
             }
     except Exception as e:
-        print(f"[agent] GitLab create issue error: {e}")
+        print(f"[agent] GitLab REST issue error: {e}")
         return None
 
 

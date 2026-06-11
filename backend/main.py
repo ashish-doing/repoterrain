@@ -54,15 +54,21 @@ async def serve_frontend():
 
 @app.get("/health")
 async def health():
+    gemini_key = bool(os.environ.get("GEMINI_API_KEY"))
     return {
         "status": "ok",
         "version": "2.0.0",
         "uptime_seconds": round(time.time() - start_time),
         "active_sessions": len(terrain_cache),
-        "gemini_available": bool(os.environ.get("GEMINI_API_KEY")),
-        "groq_available": bool(os.environ.get("GROQ_API_KEY")),
-        "gitlab_token_set": bool(os.environ.get("GITLAB_TOKEN")),
-        "embedding_model": "gemini-text-embedding-004" if os.environ.get("GEMINI_API_KEY") else "tfidf",
+        # AI stack
+        "agent_model_primary": "gemini-2.0-flash",
+        "agent_model_quota_fallback": "groq-llama3.1",   # transparent — used only when Gemini quota exceeded
+        "embedding_model": "text-embedding-004" if gemini_key else "tfidf-fallback",
+        "gemini_configured": gemini_key,
+        "groq_fallback_configured": bool(os.environ.get("GROQ_API_KEY")),
+        # GitLab integration
+        "gitlab_mcp_server": "https://gitlab.com/api/v4/mcp",
+        "gitlab_token_configured": bool(os.environ.get("GITLAB_TOKEN")),
     }
 
 
