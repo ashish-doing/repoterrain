@@ -270,4 +270,4 @@ uvicorn main:app --host 0.0.0.0 --port $PORT
 
 **2. MCP gateway** (`mcp-gateway/`) — Dockerfile-based service running `zereight/gitlab-mcp` in Streamable HTTP + Remote Authorization mode. The main backend's `GITLAB_MCP_GATEWAY_URL` env var points at this service's `/mcp` endpoint. See [`mcp-gateway/README.md`](./mcp-gateway/README.md).
 
-Live URL: `https://repoterrain-production.up.railway.app`
+Live URL: <https://repoterrain-production.up.railway.app>
