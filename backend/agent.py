@@ -106,6 +106,9 @@ async def agent_query(
     session["history"] = history[-16:]
     _sessions[session_id] = session
 
+    if len(_sessions) > 50:
+        _sessions.pop(next(iter(_sessions)))
+        
     response["reasoning"] = reasoning_steps
     return response
 
@@ -313,12 +316,12 @@ async def execute_gitlab_actions(query: str, response_text: str, repo_url: str =
             })
 
     elif "list" in q and ("mr" in q or "merge request" in q):
-        result = await gitlab_list_mrs()
+        result = await gitlab_list_mrs(repo_url)
         if result:
             actions.append({"tool": "list_mrs", "result": result})
 
     elif "pipeline" in q or ("ci" in q and "status" in q):
-        result = await gitlab_get_pipelines()
+        result = await gitlab_get_pipelines(repo_url)
         if result:
             actions.append({"tool": "get_pipelines", "result": result})
 
@@ -464,8 +467,18 @@ async def call_mcp_tool(tool_name: str, arguments: dict) -> Optional[dict]:
         return None
 
 
-async def gitlab_list_mrs() -> Optional[list]:
-    mcp_result = await call_mcp_tool("list_merge_requests", {"state": "opened", "per_page": 5})
+async def gitlab_list_mrs(repo_url: str = "") -> Optional[list]:
+    # Extract project path from repo_url e.g. https://gitlab.com/org/repo → org/repo
+    project_id = ""
+    if repo_url:
+        m = re.match(r'https?://[^/]+/(.+)', repo_url.rstrip('/'))
+        if m:
+            project_id = m.group(1).replace("/", "%2F")
+
+    mcp_args = {"state": "opened", "per_page": 5}
+    if project_id:
+        mcp_args["project_id"] = project_id.replace("%2F", "/")
+    mcp_result = await call_mcp_tool("list_merge_requests", mcp_args)
     if mcp_result:
         items = mcp_result if isinstance(mcp_result, list) else mcp_result.get("items", [])
         if items:
@@ -473,8 +486,9 @@ async def gitlab_list_mrs() -> Optional[list]:
 
     try:
         async with httpx.AsyncClient(timeout=15) as client:
+            url = f"https://gitlab.com/api/v4/projects/{project_id}/merge_requests" if project_id else "https://gitlab.com/api/v4/merge_requests"
             r = await client.get(
-                "https://gitlab.com/api/v4/merge_requests",
+                url,
                 headers={"PRIVATE-TOKEN": GITLAB_TOKEN},
                 params={"state": "opened", "per_page": 5},
             )
@@ -485,8 +499,13 @@ async def gitlab_list_mrs() -> Optional[list]:
         return None
 
 
-async def gitlab_get_pipelines() -> Optional[list]:
+async def gitlab_get_pipelines(repo_url: str = "") -> Optional[list]:
+    # Use the analyzed repo's pipeline, fall back to repoterrain-demo
     project_path = "ashish-doing/repoterrain-demo"
+    if repo_url:
+        m = re.match(r'https?://[^/]+/(.+)', repo_url.rstrip('/'))
+        if m:
+            project_path = m.group(1)
     mcp_result = await call_mcp_tool("list_pipelines", {"project_id": project_path, "per_page": 5})
     if mcp_result:
         items = mcp_result if isinstance(mcp_result, list) else mcp_result.get("items", [])
