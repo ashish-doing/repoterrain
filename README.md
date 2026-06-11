@@ -29,6 +29,9 @@
   <a href="https://github.com/ashish-doing/repoterrain/blob/main/ARCHITECTURE.md">
     <img src="https://img.shields.io/badge/%F0%9F%93%90%20Architecture-deep%20dive-6B4FFF?style=for-the-badge" />
   </a>
+  <a href="https://youtu.be/gNbQTBpotFM">
+    <img src="https://img.shields.io/badge/%F0%9F%8E%AC%20Demo%20Video-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" />
+  </a>
   <a href="https://github.com/ashish-doing/repoterrain">
     <img src="https://img.shields.io/badge/GitHub-ashish--doing%2Frepoterrain-181717?style=for-the-badge&logo=github" />
   </a>
@@ -40,7 +43,9 @@
 
 ## Demo Video
 
-> 🎬 Demo video coming soon — recording after final deployment
+[![RepoTerrain Demo](https://img.youtube.com/vi/gNbQTBpotFM/maxresdefault.jpg)](https://youtu.be/gNbQTBpotFM)
+
+▶️ [Watch the 4-minute demo on YouTube](https://youtu.be/gNbQTBpotFM)
 
 ---
 
