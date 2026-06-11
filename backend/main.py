@@ -125,6 +125,9 @@ async def ingest_repo(req: IngestRequest, request: Request):
             max_files=req.max_files,
         )
         terrain_cache[data["session_id"]] = data
+        # Evict oldest session if cache exceeds 20 entries (prevents memory leak on public deployment)
+        if len(terrain_cache) > 20:
+            terrain_cache.pop(next(iter(terrain_cache)))
         return {
             "session_id": data["session_id"],
             "nodes":      data["nodes"],
