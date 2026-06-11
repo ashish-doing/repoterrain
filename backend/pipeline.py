@@ -90,6 +90,10 @@ async def fetch_repo_files(repo_url: str, token: Optional[str] = None, max_files
         ][:max_files]
 
         print(f"[pipeline] Fetching {len(file_paths)} files...")
+
+        print(f"[pipeline] Sample paths: {file_paths[:10]}")
+        print(f"[pipeline] Total tree items: {len(all_items)}, after filter: {len(file_paths)}")
+
         for i in range(0, len(file_paths), 10):
             batch = file_paths[i:i+10]
             tasks = [fetch_file_content(client, base, fp, default_branch) for fp in batch]
@@ -111,7 +115,10 @@ async def fetch_file_content(client, base, filepath, branch="main"):
         f"{base}/repository/files/{encoded_path}/raw",
         params={"ref": branch}
     )
-    return r.text if r.status_code == 200 else ""
+    if r.status_code != 200:
+        print(f"[pipeline] FAIL {filepath}: status={r.status_code}, body={r.text[:100]}")
+        return ""
+    return r.text
 
 
 def should_skip(filepath: str) -> bool:
