@@ -10,7 +10,7 @@ requires GitLab Premium/Ultimate + Duo).
 1. New Railway service → Deploy from GitHub repo → select this repo, set **Root Directory** to `mcp-gateway/`
 2. Railway builds the Dockerfile (pulls `zereight050/gitlab-mcp:latest`, sets `STREAMABLE_HTTP=true` + `REMOTE_AUTHORIZATION=true`)
 3. No environment variables needed — GitLab tokens are passed per-request from `agent.py` via the `Private-Token` header
-4. Note the generated public URL, e.g. `https://terrific-healing-production.up.railway.app`
+4. Note the generated public URL, e.g. `https://repoterrain-mcp-gateway.onrender.com`
 5. Set `GITLAB_MCP_GATEWAY_URL=https://<that-url>/mcp` in the main backend service's environment variables
 
 ## How RepoTerrain Uses This

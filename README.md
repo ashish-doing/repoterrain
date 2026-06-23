@@ -19,7 +19,7 @@
 
 > Transform any GitLab repository into a navigable 3D semantic terrain. Files float as cards positioned by Google AI similarity. A Gemini 2.0 Flash agent analyzes the codebase and creates real GitLab issues via a self-hosted MCP server — all navigable with bare hands.
 
-<p><a href="https://repoterrain-production.up.railway.app/app"><img src="https://img.shields.io/badge/%F0%9F%9A%80%20Live%20App-Railway-0B0D0E?style=for-the-badge" /></a> <a href="https://repoterrain-production.up.railway.app/"><img src="https://img.shields.io/badge/%F0%9F%8C%90%20Landing%20Page-visit-00E5FF?style=for-the-badge" /></a> <a href="https://github.com/ashish-doing/repoterrain/blob/main/ARCHITECTURE.md"><img src="https://img.shields.io/badge/%F0%9F%93%90%20Architecture-deep%20dive-6B4FFF?style=for-the-badge" /></a> <a href="https://youtu.be/gNbQTBpotFM"><img src="https://img.shields.io/badge/%F0%9F%8E%AC%20Demo%20Video-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" /></a></p>
+<p><a href="https://repoterrain.onrender.com/app"><img src="https://img.shields.io/badge/%F0%9F%9A%80%20Live%20App-Render-0B0D0E?style=for-the-badge" /></a> <a href="https://repoterrain.onrender.com/"><img src="https://img.shields.io/badge/%F0%9F%8C%90%20Landing%20Page-visit-00E5FF?style=for-the-badge" /></a> <a href="https://github.com/ashish-doing/repoterrain/blob/main/ARCHITECTURE.md"><img src="https://img.shields.io/badge/%F0%9F%93%90%20Architecture-deep%20dive-6B4FFF?style=for-the-badge" /></a> <a href="https://youtu.be/gNbQTBpotFM"><img src="https://img.shields.io/badge/%F0%9F%8E%AC%20Demo%20Video-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" /></a></p>
 
 </div>
 
@@ -110,7 +110,7 @@ See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for full system diagrams, sequence fl
 | **Hand Tracking** | MediaPipe Tasks Vision | Gesture-based terrain navigation |
 | **GitLab MCP** | Self-hosted `zereight/gitlab-mcp` (Streamable HTTP, MCP-Protocol-Version 2025-03-26) + REST v4 fallback | Issue creation, MR listing, pipeline status |
 | **Backend** | FastAPI + uvicorn + WebSockets | Ingest pipeline, agent API, real-time updates |
-| **Deployment** | Railway (2 services) | Main backend + MCP gateway |
+| **Deployment** | Render (2 services) | Main backend + MCP gateway |
 
 ---
 
